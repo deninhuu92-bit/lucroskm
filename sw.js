@@ -1,6 +1,6 @@
 /* LucroKM: arquivos do app disponíveis offline; URLs de terceiros não são armazenadas. */
-const VERSION='lucrokm-v2.11.0';
-const CACHE_FILES=['./','./index.html','./styles.css?v=2.11.0','./app.js?v=2.11.0','./manifest.webmanifest?v=2.11.0','./lkm-favicon-64-v28.png','./lkm-apple-180-v28.png','./lkm-app-192-v28.png','./lkm-app-512-v28.png','./lkm-maskable-512-v28.png','./lkm-logo-oficial-v28.png'];
+const VERSION='lucrokm-v2.12.0';
+const CACHE_FILES=['./','./index.html','./styles.css?v=2.12.0','./app.js?v=2.12.0','./manifest.webmanifest?v=2.12.0','./lkm-favicon-64-v28.png','./lkm-apple-180-v28.png','./lkm-app-192-v28.png','./lkm-app-512-v28.png','./lkm-maskable-512-v28.png','./lkm-logo-oficial-v28.png'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(VERSION).then(cache=>cache.addAll(CACHE_FILES)).then(()=>self.skipWaiting()));});
 self.addEventListener('activate',event=>{event.waitUntil(Promise.all([caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith('lucrokm-')&&key!==VERSION).map(key=>caches.delete(key)))),self.clients.claim()]));});
 self.addEventListener('fetch',event=>{

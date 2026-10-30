@@ -1,0 +1,10 @@
+LucroKM v2.12 — Ajuste do Cofre de Senhas
+
+- Para criar um cofre novo, a senha mestra aceita agora 6 ou mais caracteres.
+- A confirmação da senha mestra continua obrigatória.
+- Cofres existentes continuam sendo desbloqueados com a senha mestra original, sem alterar ou redefinir automaticamente a senha.
+- A criptografia AES-GCM e o armazenamento local foram mantidos.
+- Atenção: seis caracteres oferecem proteção menor contra tentativas de adivinhar a senha; prefira uma senha única e mais longa quando possível.
+- Atualização do cache do PWA para a versão 2.12.
+
+Envie todos os arquivos do ZIP à raiz do repositório GitHub. Faça backup dos seus dados antes de atualizar.

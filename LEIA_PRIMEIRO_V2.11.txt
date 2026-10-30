@@ -2,7 +2,7 @@ LucroKM v2.11 — Anotações + Senhas
 
 - As Anotações Manuais continuam iguais.
 - Na seção de anotações, toque em "Abrir" ao lado de "Senhas".
-- Na primeira utilização, crie uma senha mestra com no mínimo 12 caracteres.
+- Na primeira utilização, crie uma senha mestra com no mínimo 6 caracteres (recomenda-se uma senha mais longa e exclusiva por segurança).
 - Adicione nome do site/app, usuário (opcional) e senha.
 - Depois é possível mostrar, copiar usuário e senha, editar e excluir as senhas.
 - O cofre é criptografado com AES-GCM 256 bits e chave derivada por PBKDF2-SHA256 (310.000 iterações).

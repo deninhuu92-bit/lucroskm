@@ -386,9 +386,9 @@ function lockVault(message='Cofre bloqueado.'){
 function updateVaultAuthMode(){
   const vault=loadPasswordVault(),newVault=!vault;
   $('#vaultConfirmWrap').classList.toggle('hidden',!newVault);
-  $('#vaultMaster').minLength=newVault?12:1;
+  $('#vaultMaster').minLength=newVault?6:1;
   $('#vaultAuthButton').textContent=newVault?'Criar cofre protegido':'Desbloquear cofre';
-  $('#vaultAuthHint').textContent=newVault?'Crie uma senha mestra de pelo menos 12 caracteres. Se perder esta senha, não poderá recuperar as senhas salvas.':'Digite sua senha mestra para acessar suas senhas.';
+  $('#vaultAuthHint').textContent=newVault?'Mínimo de 6 caracteres. Para maior segurança, prefira uma senha longa e exclusiva. Se esquecer a senha mestra, não poderá recuperar o cofre.':'Digite sua senha mestra para acessar suas senhas.';
   if(vault?.invalid){$('#vaultAuthButton').disabled=true;vaultMessage('Dados do cofre danificados. Restaure um backup válido.',true);}
   else $('#vaultAuthButton').disabled=false;
 }
@@ -416,7 +416,7 @@ async function submitVaultAuth(event){
   try{
     if(stored?.invalid)throw new Error('Cofre inválido; não sobrescreva os dados');
     if(!stored){
-      if(password.length<12||password!==$('#vaultMasterConfirm').value)throw new Error('Use 12 ou mais caracteres e confirme a mesma senha mestra.');
+      if(password.length<6||password!==$('#vaultMasterConfirm').value)throw new Error('Use pelo menos 6 caracteres e confirme a mesma senha mestra.');
       const salt=crypto.getRandomValues(new Uint8Array(16));
       const key=await deriveVaultKey(password,salt,VAULT_ITERATIONS);
       const initial=await vaultEncrypt([],key,salt,VAULT_ITERATIONS);
