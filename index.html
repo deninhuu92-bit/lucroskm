@@ -9,10 +9,11 @@
 <meta content="black-translucent" name="apple-mobile-web-app-status-bar-style"/>
 <meta content="LucroKM" name="apple-mobile-web-app-title"/>
 <meta content="Controle de jornadas, ganhos, combustível e lucro para motoristas de aplicativo. Funciona offline." name="description"/>
-<link href="./manifest.webmanifest?v=2.6.0" rel="manifest"/>
-<link href="./icons/icon-180.png" rel="apple-touch-icon"/>
-<link href="./icons/favicon-64.png?v=2.6.0" rel="icon" type="image/png"/>
-<link href="./styles.css?v=2.6.0" rel="stylesheet"/>
+<link href="./manifest.webmanifest?v=2.7.0" rel="manifest"/>
+<link href="./icons/lkm-apple-180-v27.png" rel="apple-touch-icon" sizes="180x180"/>
+<link href="./icons/lkm-favicon-64-v27.png" rel="icon" sizes="64x64" type="image/png"/>
+<link href="./icons/lkm-favicon-64-v27.png" rel="shortcut icon" type="image/png"/>
+<link href="./styles.css?v=2.7.0" rel="stylesheet"/>
 <title>LucroKM · Seu dinheiro na direção certa</title>
 <meta content="dark" name="color-scheme"/></head>
 <body>
@@ -21,8 +22,8 @@
 <div class="app-shell">
 <header class="topbar">
 <div class="brand">
-<img alt="" class="brand-mark" height="43" src="./icons/icon-192.png" width="43"/>
-<div><div class="eyebrow" id="greeting">Olá, motorista</div><h1>Lucro<span>KM</span></h1></div>
+<img alt="LKM Lucros KM — logomarca oficial" class="brand-logo-official" height="72" src="./icons/lkm-logo-oficial-v27.png" width="108"/>
+<div class="brand-caption"><div class="eyebrow" id="greeting">Olá, motorista</div><h1>Meu painel</h1></div>
 </div>
 <div class="header-actions">
 <button aria-label="Ajustar tamanho das letras" class="icon-btn font-shortcut" id="fontTopBtn" title="Tamanho das letras" type="button">Aa</button>
@@ -31,7 +32,7 @@
 </div>
 </header>
 <div aria-label="Instalar LucroKM" class="install-banner" id="installBanner" role="region">
-<div class="install-banner-copy"><span aria-hidden="true" class="install-banner-icon"><img alt="" aria-hidden="true" class="app-icon" loading="eager" src="./assets/icons/mobile-screen-button.svg"/></span><div><strong>LucroKM no seu celular</strong><small>Instale o ícone e abra como um aplicativo.</small></div></div>
+<div class="install-banner-copy"><span aria-hidden="true" class="install-banner-icon"><img alt="" aria-hidden="true" class="app-icon" loading="eager" src="./icons/lkm-app-192-v27.png"/></span><div><strong>LucroKM no seu celular</strong><small>Instale o ícone e abra como um aplicativo.</small></div></div>
 <button class="install-banner-btn" id="installBtn" type="button">Instalar</button>
 <button aria-label="Dispensar convite de instalação" class="dismiss-btn" id="dismissInstall" type="button">×</button>
 </div>
@@ -80,9 +81,9 @@
 <p>O ajuste vale para todo o aplicativo e fica salvo neste celular.</p>
 <button class="font-reset" id="fontResetBtn" type="button">Voltar ao tamanho padrão</button>
 </section><button class="primary-btn with-icon" type="submit"><img alt="" aria-hidden="true" class="btn-icon" loading="eager" src="./assets/icons/floppy-disk.svg"/>Salvar preferências</button><div class="settings-tools"><button class="tool-btn" id="settingsInstall" type="button"><span aria-hidden="true" class="tool-icon tone-teal"><img alt="" aria-hidden="true" class="app-icon" loading="eager" src="./assets/icons/mobile-screen-button.svg"/></span>Instalar no celular</button><button class="tool-btn" id="backupBtn" type="button"><span aria-hidden="true" class="tool-icon tone-blue"><img alt="" aria-hidden="true" class="app-icon" loading="eager" src="./assets/icons/cloud-arrow-down.svg"/></span>Baixar backup (.json)</button><button class="tool-btn" id="restoreBtn" type="button"><span aria-hidden="true" class="tool-icon tone-blue"><img alt="" aria-hidden="true" class="app-icon" loading="eager" src="./assets/icons/upload.svg"/></span>Restaurar backup</button><button class="tool-btn" id="seedBtn" type="button"><span aria-hidden="true" class="tool-icon tone-violet"><img alt="" aria-hidden="true" class="app-icon" loading="eager" src="./assets/icons/circle-plus.svg"/></span>Inserir dados de exemplo</button><button class="tool-btn danger" id="clearBtn" type="button"><span aria-hidden="true" class="tool-icon tone-red"><img alt="" aria-hidden="true" class="app-icon" loading="eager" src="./assets/icons/trash-can.svg"/></span>Excluir registros de hoje</button></div><p class="privacy-note">Seus dados ficam neste navegador. Faça backups periódicos, pois limpar os dados do site pode apagar seus registros.</p></form></dialog>
-<dialog id="installDialog"><div class="install-dialog-body"><div class="modal-head"><span aria-hidden="true" class="modal-title-tile tone-teal"><img alt="" aria-hidden="true" class="app-icon" loading="eager" src="./assets/icons/mobile-screen-button.svg"/></span><div><span class="eyebrow">Acesso rápido</span><h3>Instalar LucroKM</h3></div><button aria-label="Fechar" class="icon-btn" data-close="installDialog" type="button"><img alt="" aria-hidden="true" class="app-icon" loading="eager" src="./assets/icons/xmark.svg"/></button></div><img alt="Ícone do LucroKM" class="install-preview" src="./icons/icon-192.png"/><p id="installInstructions">Adicione o LucroKM à tela inicial do seu celular e abra em tela cheia.</p><button class="primary-btn with-icon" id="installConfirm" type="button"><img alt="" aria-hidden="true" class="btn-icon" loading="eager" src="./assets/icons/circle-check.svg"/>Entendi</button></div></dialog>
+<dialog id="installDialog"><div class="install-dialog-body"><div class="modal-head"><span aria-hidden="true" class="modal-title-tile tone-teal"><img alt="" aria-hidden="true" class="app-icon" loading="eager" src="./assets/icons/mobile-screen-button.svg"/></span><div><span class="eyebrow">Acesso rápido</span><h3>Instalar LucroKM</h3></div><button aria-label="Fechar" class="icon-btn" data-close="installDialog" type="button"><img alt="" aria-hidden="true" class="app-icon" loading="eager" src="./assets/icons/xmark.svg"/></button></div><img alt="Ícone do LucroKM" class="install-preview" src="./icons/lkm-app-192-v27.png"/><p id="installInstructions">Adicione o LucroKM à tela inicial do seu celular e abra em tela cheia.</p><button class="primary-btn with-icon" id="installConfirm" type="button"><img alt="" aria-hidden="true" class="btn-icon" loading="eager" src="./assets/icons/circle-check.svg"/>Entendi</button></div></dialog>
 <div aria-live="polite" class="toast" id="toast" role="status"></div>
 <input accept="application/json,.json" aria-label="Selecionar arquivo de backup" class="hidden" id="restoreFile" type="file"/>
-<script defer="" src="./app.js?v=2.6.0"></script>
+<script defer="" src="./app.js?v=2.7.0"></script>
 </body>
 </html>

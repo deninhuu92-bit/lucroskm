@@ -149,3 +149,18 @@ dialog{color:var(--text);background:#15191e;border:1px solid rgba(255,255,255,.1
 @media(max-width:540px){.history-card-head{flex-wrap:wrap}.history-net{flex-direction:column;align-items:flex-start}.history-stats{grid-template-columns:1fr}.history-actions .ghost-btn,.history-actions .primary-btn{width:100%;justify-content:center}}
 @media(max-width:360px){.history-counter{font-size:calc(10px * var(--font-scale));padding:6px 10px}.history-card{padding:15px}.history-date strong{font-size:calc(19px * var(--font-scale))}}
 @media print{.daily-history,.history-intro,.history-counter{display:none!important}}
+
+
+/* v2.7 — identidade LKM oficial no cabeçalho, com proporções responsivas. */
+.brand{display:flex;align-items:center;gap:11px;flex:1;min-width:0}
+.brand-logo-official{display:block;object-fit:contain;width:clamp(98px,10vw,126px);height:auto;aspect-ratio:3/2;flex:0 0 auto;filter:drop-shadow(0 4px 8px rgba(241,125,21,.13))}
+.brand-caption{min-width:0}
+.brand-caption h1{font-size:calc(19px * var(--font-scale));font-weight:740;letter-spacing:-.045em;margin-top:3px}
+.header-actions{flex:0 0 auto}
+@media(max-width:600px){.brand-logo-official{width:112px}.brand-caption{display:none}.topbar{gap:12px}.header-actions{gap:6px}}
+@media(max-width:370px){.brand-logo-official{width:100px}.topbar{gap:5px}.header-actions .icon-btn{width:40px;height:40px}}
+@media(max-width:335px){.brand-logo-official{width:91px}.header-actions .icon-btn{width:38px;height:38px}}
+
+/* v2.7 logo oficial no convite de instalação. */
+.install-banner-icon{background:transparent;border:0;overflow:hidden}
+.install-banner-icon img{width:37px;height:37px;border-radius:12px;object-fit:cover}

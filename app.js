@@ -340,7 +340,7 @@ function bindEvents(){
   window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();deferredInstallPrompt=event;updateInstallUI();});
   window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;updateInstallUI();toast('LucroKM instalado no dispositivo!');});
 }
-function setupServiceWorker(){if(!('serviceWorker' in navigator)||!window.isSecureContext)return;navigator.serviceWorker.register('./sw.js').catch(()=>{});}
+function setupServiceWorker(){if(!('serviceWorker' in navigator)||!window.isSecureContext)return;navigator.serviceWorker.register('./sw.js?v=2.7.0',{updateViaCache:'none'}).catch(()=>{});}
 applyFontScale();setGreeting();reportDateInit();bindEvents();updateInstallUI();renderAll();setupServiceWorker();
 setInterval(()=>{renderStats();const h=new Date().getHours();if(h===0||h===12) setGreeting();},1000);
 // Recalcular o painel quando o app retorna ao primeiro plano ou muda o dia.

@@ -1,6 +1,6 @@
 /* LucroKM: arquivos do app disponíveis offline; URLs de terceiros não são armazenadas. */
-const VERSION='lucrokm-v2.6.0';
-const CACHE_FILES=['./','./index.html','./styles.css?v=2.6.0','./app.js?v=2.6.0','./manifest.webmanifest?v=2.6.0','./icons/favicon-64.png?v=2.6.0','./icons/icon-180.png','./icons/icon-192.png','./icons/icon-512.png','./icons/icon-maskable-512.png',
+const VERSION='lucrokm-v2.7.0';
+const CACHE_FILES=['./','./index.html','./styles.css?v=2.7.0','./app.js?v=2.7.0','./manifest.webmanifest?v=2.7.0','./icons/lkm-favicon-64-v27.png','./icons/lkm-apple-180-v27.png','./icons/lkm-app-192-v27.png','./icons/lkm-app-512-v27.png','./icons/lkm-maskable-512-v27.png','./icons/lkm-logo-oficial-v27.png',
   './assets/icons/arrow-right-arrow-left.svg',
   './assets/icons/arrow-trend-down.svg',
   './assets/icons/arrow-trend-up.svg',
