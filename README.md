@@ -52,3 +52,9 @@ Para atualizar no Vercel, publique esta pasta na raiz do projeto e recarregue o 
 - Removido o segundo ícone redundante do título "Indicadores de hoje".
 - Revisados respiro e alinhamento dos valores nos quatro cartões.
 - CSS versionado e cache do Service Worker atualizado para a nova versão aparecer após publicação.
+
+
+## Novidades v2.5
+- Histórico diário com cartões por data.
+- Botão "Ver fechamento" para abrir rapidamente qualquer dia salvo.
+- Resumo por dia com lucro, faturamento, km e jornada.

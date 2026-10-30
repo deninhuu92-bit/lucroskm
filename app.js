@@ -11,7 +11,7 @@ const brl = value => (Number(value)||0).toLocaleString('pt-BR',{style:'currency'
 const numberFormat = value => (Number(value)||0).toLocaleString('pt-BR',{maximumFractionDigits:2});
 const inputNumber = raw => { let s=String(raw||'').trim().replace(/\s/g,'').replace(/[R$]/g,''); if (!s) return 0; if(s.includes(',')) s=s.replace(/\./g,'').replace(',','.'); else if(/^\d{1,3}(\.\d{3})+$/.test(s)) s=s.replace(/\./g,''); const n=Number(s); return Number.isFinite(n)?n:NaN; };
 const id = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-const defaultState = () => ({schemaVersion:3, fontScale:100, goal:350, maintenanceRate:5, costPerKm:0, vehicle:{name:'',plate:''}, journey:{active:false,startedAt:null,elapsed:0,km:0,date:dateKey()}, journeys:[], entries:[]});
+const defaultState = () => ({schemaVersion:4, fontScale:100, goal:350, maintenanceRate:5, costPerKm:0, vehicle:{name:'',plate:''}, journey:{active:false,startedAt:null,elapsed:0,km:0,date:dateKey()}, journeys:[], entries:[]});
 const safeMoney = n => Number.isFinite(Number(n)) ? Math.max(0,Math.min(1e9,Number(n))) : 0;
 const safeText = (s,max=140) => String(s??'').slice(0,max);
 const safePercent = n => Math.min(50,Math.max(0,Number(n)||0));
@@ -137,6 +137,104 @@ function renderTransactions(containerSelector,entries,empty){
 }
 const sortedEntries = arr => [...arr].sort((a,b)=>b.ts-a.ts);
 function renderHomeTransactions(){renderTransactions('#transactions',sortedEntries(state.entries.filter(e=>e.date===dateKey())).slice(0,8),'Nenhum registro hoje. Adicione sua primeira receita ou despesa.');}
+
+function hasAnyDailyActivity(day){
+  const s=summary(day);
+  return [s.revenue,s.costs,s.fuel,s.km,s.hours,s.reserve,s.kmCost].some(v=>Math.abs(Number(v)||0)>0.0001) || state.entries.some(e=>e.date===day);
+}
+function collectHistoryDays(){
+  const set=new Set();
+  state.entries.forEach(e=>{ if(validDate(e.date)) set.add(e.date); });
+  state.journeys.forEach(j=>{
+    if(validDate(j.date)) set.add(j.date);
+    const endDay=dateKey(j.endedAt);
+    if(validDate(endDay)) set.add(endDay);
+  });
+  if(state.journey?.active){
+    if(validDate(state.journey.date)) set.add(state.journey.date);
+    set.add(dateKey());
+  }
+  return [...set].filter(day=>validDate(day) && hasAnyDailyActivity(day)).sort((a,b)=>dateOf(b)-dateOf(a));
+}
+function formatDayLabel(day){
+  const d=dateOf(day);
+  return {
+    short:d.toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}).replace('.', '').toUpperCase(),
+    long:d.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'})
+  };
+}
+function openDailyReport(day){
+  if(!validDate(day)) return;
+  $('#reportStart').value=day;
+  $('#reportEnd').value=day;
+  renderReports();
+  requestAnimationFrame(()=>{
+    $('#reportMetrics')?.scrollIntoView({behavior:'smooth',block:'start'});
+  });
+  toast(`Fechamento de ${day.split('-').reverse().join('/')} carregado.`);
+}
+function renderDailyHistory(){
+  const list=$('#dailyHistoryList');
+  const counter=$('#dailyHistoryCount');
+  const summaryText=$('#dailyHistorySummary');
+  if(!list || !counter || !summaryText) return;
+  list.replaceChildren();
+  const days=collectHistoryDays();
+  counter.textContent=`${days.length} ${days.length===1?'dia salvo':'dias salvos'}`;
+  summaryText.textContent=days.length?`Cada fechamento fica salvo neste celular. Toque em “Ver fechamento” para revisar qualquer dia.`:'Quando você registrar corridas, abastecimentos ou despesas, cada dia aparecerá aqui.';
+  if(!days.length){
+    const empty=document.createElement('div');
+    empty.className='empty';
+    empty.textContent='Nenhum fechamento salvo ainda. Use o app durante o dia e volte aqui para revisar o histórico.';
+    list.append(empty);
+    return;
+  }
+  for(const day of days){
+    const info=formatDayLabel(day);
+    const s=summary(day);
+    const card=document.createElement('article');
+    card.className='history-card';
+    const isToday=day===dateKey();
+    const reachedGoal=s.net>=state.goal;
+    const statusLabel=isToday ? (state.journey.active?'Hoje · em andamento':'Hoje') : reachedGoal ? 'Meta batida' : 'Fechamento salvo';
+    const header=document.createElement('div');
+    header.className='history-card-head';
+    const badgeTone=isToday?'orange':reachedGoal?'green':'slate';
+    header.innerHTML=`<div class="history-date"><strong>${info.short}</strong><small>${info.long}</small></div><span class="history-badge tone-${badgeTone}">${statusLabel}</span>`;
+    const hero=document.createElement('div');
+    hero.className='history-net';
+    hero.innerHTML=`<span>Lucro estimado</span><strong class="${s.net>=0?'plus':'minus'}">${brl(s.net)}</strong>`;
+    const stats=document.createElement('div');
+    stats.className='history-stats';
+    const statsData=[
+      ['Faturamento',brl(s.revenue)],
+      ['Despesas',brl(s.costs+s.reserve+s.kmCost)],
+      ['Km',`${numberFormat(s.km)} km`],
+      ['Jornada',timeFormat(s.hours*3600)]
+    ];
+    statsData.forEach(([label,val])=>{
+      const item=document.createElement('div');
+      item.className='history-stat';
+      item.innerHTML=`<small>${label}</small><strong>${val}</strong>`;
+      stats.append(item);
+    });
+    const actions=document.createElement('div');
+    actions.className='history-actions';
+    const viewBtn=document.createElement('button');
+    viewBtn.type='button';
+    viewBtn.className='primary-btn history-btn';
+    viewBtn.textContent='Ver fechamento';
+    viewBtn.addEventListener('click',()=>openDailyReport(day));
+    const editBtn=document.createElement('button');
+    editBtn.type='button';
+    editBtn.className='ghost-btn history-btn';
+    editBtn.textContent='Ver movimentações';
+    editBtn.addEventListener('click',()=>openDailyReport(day));
+    actions.append(viewBtn,editBtn);
+    card.append(header,hero,stats,actions);
+    list.append(card);
+  }
+}
 function showView(name){
   currentView=name;
   $$('.app-view').forEach(v=>v.classList.toggle('hidden',v.id!==`${name}View`));
@@ -163,7 +261,9 @@ function renderReports(){
   recent.forEach(d=>{const bar=document.createElement('div');bar.className='chart-col';const amount=document.createElement('span');amount.className='chart-val';amount.textContent=brl(d.net);const track=document.createElement('div');track.className='chart-track';const fill=document.createElement('div');fill.className=`chart-fill ${d.net<0?'negative':''}`;fill.style.height=`${Math.max(3,Math.abs(d.net)/max*100)}%`;fill.title=`${d.day}: ${brl(d.net)}`;track.append(fill);const label=document.createElement('small');label.textContent=d.day.slice(8,10)+'/'+d.day.slice(5,7);bar.append(amount,track,label);chart.append(bar);});
   if(!recent.some(d=>d.net!==0)){chart.replaceChildren();const d=document.createElement('div');d.className='empty';d.textContent='Sem lucro registrado neste período.';chart.append(d);}
   renderTransactions('#allTransactions',sortedEntries(state.entries.filter(e=>e.date>=from&&e.date<=to)),'Nenhuma movimentação neste período.');
+  renderDailyHistory();
 }
+
 function renderAll(){renderStats();renderHomeTransactions();if(currentView==='reports')renderReports();}
 function entryOptions(type){return {income:['Uber','99','Particular','Outro'],fuel:['Gasolina','Etanol','GNV','Diesel','Outro'],expense:['Alimentação','Pedágio','Estacionamento','Lavagem','Manutenção','Seguro','Aluguel','Outro']}[type]||[];}
 function openEntry(type,record=null){
@@ -179,7 +279,7 @@ function openEntry(type,record=null){
 }
 function deleteEntry(entryId){const e=state.entries.find(e=>e.id===entryId);if(!e||!confirm(`Excluir ${e.category} (${brl(e.value)})?`))return;state.entries=state.entries.filter(e=>e.id!==entryId);persist();toast('Registro excluído.');}
 function download(name,data,type){const blob=new Blob([data],{type});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1200);}
-function exportBackup(){download(`lucrokm-backup-${dateKey()}.json`,JSON.stringify({...state,schemaVersion:3,exportedAt:new Date().toISOString()},null,2),'application/json');toast('Backup gerado. Guarde em local seguro.');}
+function exportBackup(){download(`lucrokm-backup-${dateKey()}.json`,JSON.stringify({...state,schemaVersion:4,exportedAt:new Date().toISOString()},null,2),'application/json');toast('Backup gerado. Guarde em local seguro.');}
 function csvCell(v){let s=String(v??'');if(/^[=+@\-\t\r]/.test(s))s="'"+s;return `"${s.replace(/"/g,'""')}"`;}
 function exportCsv(){const from=$('#reportStart').value,to=$('#reportEnd').value;const rows=[['Data','Tipo','Categoria','Valor (R$)','Litros','Preço por litro','Observação'],...sortedEntries(state.entries.filter(e=>e.date>=from&&e.date<=to)).map(e=>[e.date,e.type,e.category,e.value.toFixed(2).replace('.',','),e.liters||'',e.price||'',e.note])];download(`lucrokm-registros-${from}-a-${to}.csv`,'\ufeff'+rows.map(row=>row.map(csvCell).join(';')).join('\r\n'),'text/csv;charset=utf-8');toast('CSV exportado com sucesso.');}
 function reportDateInit(){const today=dateKey();const d=new Date();d.setDate(d.getDate()-6);$('#reportStart').value=dateKey(d);$('#reportEnd').value=today;}
