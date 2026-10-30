@@ -5,6 +5,9 @@ const iconSvg = name => SVG_ICON_LIBRARY[name] || SVG_ICON_LIBRARY['receipt'];
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 const STORAGE_KEY = 'lucrokm_state';
+// Evita valores extrapolados a partir de segundos/minutos de jornada.
+const MIN_HOURS_FOR_HOURLY_RATE = 1;
+const hourlyRateLabel = (net,hours) => Number.isFinite(hours)&&hours>=MIN_HOURS_FOR_HOURLY_RATE ? brl(net/hours) : '—';
 const FONT_SCALES=[100,112,125,140];
 const normalizeFontScale = value => FONT_SCALES.includes(Number(value)) ? Number(value) : 100;
 const dateKey = (value = Date.now()) => { const d = new Date(value); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
@@ -88,7 +91,8 @@ function setGreeting(){const h=new Date().getHours();$('#greeting').textContent=
 function renderStats(){
   const t=summary(dateKey());
   $('#netToday').textContent=brl(t.net); $('#revenueToday').textContent=brl(t.revenue); $('#costToday').textContent=brl(t.costs+t.reserve+t.kmCost);
-  $('#perHour').textContent=brl(t.hours>0?t.net/t.hours:0);
+  $('#perHour').textContent=hourlyRateLabel(t.net,t.hours);
+  $('#perHourHint').textContent=t.hours>=MIN_HOURS_FOR_HOURLY_RATE ? 'Lucro estimado ÷ horas trabalhadas' : 'Disponível após 1h de jornada';
   $('#timer').textContent=timeFormat(elapsedSeconds());
   $('#kmToday').textContent=`${numberFormat(t.km)} km`; $('#perKm').textContent=brl(t.km?t.net/t.km:0);
   $('#fuelToday').textContent=brl(t.fuel); $('#fuelLiters').textContent=`${numberFormat(t.liters)} L registrados`;
@@ -295,7 +299,7 @@ function renderReports(){
   if(from>to){$('#reportMetrics').textContent='A data inicial deve ser anterior à data final.';$('#reportChart').replaceChildren();$('#allTransactions').replaceChildren();return;}
   const days=dateArray(from,to,400);if(!days.length||dateOf(to)-dateOf(from)>366*86400000){$('#reportMetrics').textContent='Selecione um período de até 366 dias.';return;}
   const ss=days.map(d=>({day:d,...summary(d)}));const sum=ss.reduce((a,d)=>{for(const k of ['revenue','costs','net','km','hours','reserve','kmCost'])a[k]+=d[k];return a;},{revenue:0,costs:0,net:0,km:0,hours:0,reserve:0,kmCost:0});
-  const metrics=[['Lucro estimado',brl(sum.net)],['Faturamento',brl(sum.revenue)],['Despesas + reservas',brl(sum.costs+sum.reserve+sum.kmCost)],['Km rodados',`${numberFormat(sum.km)} km`],['Lucro por hora',brl(sum.hours?sum.net/sum.hours:0)],['Lucro por km',brl(sum.km?sum.net/sum.km:0)]];
+  const metrics=[['Lucro estimado',brl(sum.net)],['Faturamento',brl(sum.revenue)],['Despesas + reservas',brl(sum.costs+sum.reserve+sum.kmCost)],['Km rodados',`${numberFormat(sum.km)} km`],['Lucro por hora',hourlyRateLabel(sum.net,sum.hours)],['Lucro por km',brl(sum.km?sum.net/sum.km:0)]];
   const m=$('#reportMetrics');m.replaceChildren();const reportIcons=[['wallet','green'],['arrow-trend-up','green'],['receipt','red'],['road','blue'],['clock','orange'],['gauge-high','violet']];
   metrics.forEach(([label,val],index)=>{const card=document.createElement('article');card.className='report-metric';
     const s=document.createElement('span');s.className='report-label';const ico=document.createElement('span');ico.className=`report-icon tone-${reportIcons[index][1]}`;
@@ -325,7 +329,7 @@ function openEntry(type,record=null){
 }
 function deleteEntry(entryId){const e=state.entries.find(e=>e.id===entryId);if(!e||!confirm(`Excluir ${e.category} (${brl(e.value)})?`))return;state.entries=state.entries.filter(e=>e.id!==entryId);persist();toast('Registro excluído.');}
 function download(name,data,type){const blob=new Blob([data],{type});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1200);}
-function exportBackup(){download(`lucrokm-backup-${dateKey()}.json`,JSON.stringify({...state,schemaVersion:5,exportedAt:new Date().toISOString()},null,2),'application/json');toast('Backup gerado. Guarde em local seguro.');}
+function exportBackup(){const payload={...state,schemaVersion:6,exportedAt:new Date().toISOString()};const vault=loadPasswordVault();if(vault?.invalid){toast('Cofre danificado; restaure um backup válido antes de exportar.');return;}if(vault)payload.passwordVault=vault;download(`lucrokm-backup-${dateKey()}.json`,JSON.stringify(payload,null,2),'application/json');toast('Backup gerado. O cofre segue criptografado. Guarde em local seguro.');}
 function csvCell(v){let s=String(v??'');if(/^[=+@\-\t\r]/.test(s))s="'"+s;return `"${s.replace(/"/g,'""')}"`;}
 function exportCsv(){const from=$('#reportStart').value,to=$('#reportEnd').value;const rows=[['Data','Tipo','Categoria','Valor (R$)','Litros','Preço por litro','Observação'],...sortedEntries(state.entries.filter(e=>e.date>=from&&e.date<=to)).map(e=>[e.date,e.type,e.category,e.value.toFixed(2).replace('.',','),e.liters||'',e.price||'',e.note])];download(`lucrokm-registros-${from}-a-${to}.csv`,'\ufeff'+rows.map(row=>row.map(csvCell).join(';')).join('\r\n'),'text/csv;charset=utf-8');toast('CSV exportado com sucesso.');}
 function reportDateInit(){const today=dateKey();const d=new Date();d.setDate(d.getDate()-6);$('#reportStart').value=dateKey(d);$('#reportEnd').value=today;}
@@ -337,6 +341,190 @@ function installHelp(){
 }
 async function installApp(){if(window.matchMedia('(display-mode: standalone)').matches||navigator.standalone){toast('LucroKM já está instalado!');return;}if(deferredInstallPrompt){const prompt=deferredInstallPrompt;deferredInstallPrompt=null;try{await prompt.prompt();const choice=await prompt.userChoice;if(choice.outcome==='accepted'){$('#installBanner').classList.add('hidden');toast('Instalação iniciada.');}else installHelp();}catch{installHelp();}}else installHelp();}
 function updateInstallUI(){const installed=window.matchMedia('(display-mode: standalone)').matches||navigator.standalone;$('#installBanner').classList.toggle('hidden',Boolean(installed)||localStorage.getItem('lucrokm_install_dismissed')==='1');$('#installTopBtn').classList.toggle('hidden',Boolean(installed));}
+
+// Cofre de senhas isolado dos registros financeiros e anotações.
+// AES-GCM + PBKDF2 (310.000 iterações). Apenas o JSON cifrado é persistido.
+const VAULT_STORAGE_KEY='lucrokm_password_vault_v1';
+const VAULT_ITERATIONS=310000;
+let vaultKey=null, vaultRecords=[], vaultLastInteraction=0, vaultHiddenAt=0, vaultReveals=[];
+const vaultEncoder=new TextEncoder(), vaultDecoder=new TextDecoder();
+const vaultBytesToBase64=bytes=>{let binary='';for(let i=0;i<bytes.length;i+=0x4000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x4000));return btoa(binary);};
+const vaultBase64ToBytes=str=>Uint8Array.from(atob(str),c=>c.charCodeAt(0));
+const vaultMessage=(message,error=false)=>{const el=$('#vaultMessage');el.textContent=message;el.classList.toggle('vault-error',error);};
+function validVaultPayload(v){
+  if(!v || v.version!==1 || !Number.isInteger(v.iterations) || v.iterations<200000 || v.iterations>1000000)return false;
+  try {return vaultBase64ToBytes(v.salt).length===16 && vaultBase64ToBytes(v.iv).length===12 && vaultBase64ToBytes(v.ciphertext).length>=16;}catch{return false;}
+}
+function loadPasswordVault(){
+  const raw=localStorage.getItem(VAULT_STORAGE_KEY);
+  if(raw===null)return null;
+  try{const value=JSON.parse(raw);return validVaultPayload(value)?value:{invalid:true};}catch{return {invalid:true};}
+}
+async function deriveVaultKey(password,salt,iterations){
+  const base=await crypto.subtle.importKey('raw',vaultEncoder.encode(password),'PBKDF2',false,['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2',hash:'SHA-256',salt,iterations},base,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
+}
+async function vaultEncrypt(records,key,salt,iterations){
+  const iv=crypto.getRandomValues(new Uint8Array(12));
+  const ciphertext=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,vaultEncoder.encode(JSON.stringify(records)));
+  return {version:1,iterations,salt:vaultBytesToBase64(salt),iv:vaultBytesToBase64(iv),ciphertext:vaultBytesToBase64(new Uint8Array(ciphertext))};
+}
+function vaultCloseReveals(){
+  vaultReveals.forEach(t=>clearTimeout(t));vaultReveals=[];
+  $$('#vaultItems .vault-secret').forEach(span=>{span.textContent='••••••••';});
+  $$('#vaultItems .vault-reveal').forEach(button=>{button.textContent='Mostrar';button.setAttribute('aria-pressed','false');});
+}
+function lockVault(message='Cofre bloqueado.'){
+  vaultKey=null;vaultRecords=[];vaultLastInteraction=0;
+  vaultCloseReveals();
+  $('#vaultItemForm').reset();$('#vaultItemId').value='';
+  $('#vaultMaster').value='';$('#vaultMasterConfirm').value='';
+  $('#vaultItems').replaceChildren();$('#vaultUnlocked').classList.add('hidden');
+  $('#vaultAuthForm').classList.remove('hidden');
+  updateVaultAuthMode();vaultMessage(message);
+}
+function updateVaultAuthMode(){
+  const vault=loadPasswordVault(),newVault=!vault;
+  $('#vaultConfirmWrap').classList.toggle('hidden',!newVault);
+  $('#vaultMaster').minLength=newVault?12:1;
+  $('#vaultAuthButton').textContent=newVault?'Criar cofre protegido':'Desbloquear cofre';
+  $('#vaultAuthHint').textContent=newVault?'Crie uma senha mestra de pelo menos 12 caracteres. Se perder esta senha, não poderá recuperar as senhas salvas.':'Digite sua senha mestra para acessar suas senhas.';
+  if(vault?.invalid){$('#vaultAuthButton').disabled=true;vaultMessage('Dados do cofre danificados. Restaure um backup válido.',true);}
+  else $('#vaultAuthButton').disabled=false;
+}
+function toggleVault(){
+  const panel=$('#vaultPanel'),opening=panel.classList.contains('hidden');
+  panel.classList.toggle('hidden',!opening);
+  $('#vaultToggle').setAttribute('aria-expanded',String(opening));
+  $('#vaultToggle').textContent=opening?'Fechar':'Abrir';
+  if(opening){updateVaultAuthMode();if(vaultKey)renderVaultItems();}
+  else{lockVault('Cofre bloqueado.');}
+}
+function normalizeVaultRecords(records){
+  if(!Array.isArray(records)||records.length>250)throw new Error('Formato de cofre inválido');
+  return records.map(item=>{
+    if(!item||typeof item.service!=='string'||typeof item.username!=='string'||typeof item.password!=='string')throw new Error('Registro inválido');
+    return {id:safeText(item.id||id(),100),service:safeText(item.service,70),username:safeText(item.username,160),password:safeText(item.password,512),updatedAt:Number(item.updatedAt)||Date.now()};
+  });
+}
+async function submitVaultAuth(event){
+  event.preventDefault();
+  if(!crypto?.subtle||!crypto?.getRandomValues||!window.isSecureContext){vaultMessage('O cofre precisa ser aberto por HTTPS (Vercel) em um navegador compatível.',true);return;}
+  const password=$('#vaultMaster').value;
+  const stored=loadPasswordVault();
+  const authBtn=$('#vaultAuthButton');authBtn.disabled=true;
+  try{
+    if(stored?.invalid)throw new Error('Cofre inválido; não sobrescreva os dados');
+    if(!stored){
+      if(password.length<12||password!==$('#vaultMasterConfirm').value)throw new Error('Use 12 ou mais caracteres e confirme a mesma senha mestra.');
+      const salt=crypto.getRandomValues(new Uint8Array(16));
+      const key=await deriveVaultKey(password,salt,VAULT_ITERATIONS);
+      const initial=await vaultEncrypt([],key,salt,VAULT_ITERATIONS);
+      localStorage.setItem(VAULT_STORAGE_KEY,JSON.stringify(initial));
+      vaultKey=key;vaultRecords=[];vaultMessage('Cofre criado e protegido. Guarde sua senha mestra.');
+    }else{
+      const salt=vaultBase64ToBytes(stored.salt);
+      const key=await deriveVaultKey(password,salt,stored.iterations);
+      const raw=await crypto.subtle.decrypt({name:'AES-GCM',iv:vaultBase64ToBytes(stored.iv)},key,vaultBase64ToBytes(stored.ciphertext));
+      const records=normalizeVaultRecords(JSON.parse(vaultDecoder.decode(raw)));
+      vaultKey=key;vaultRecords=records;vaultMessage('Cofre desbloqueado.');
+    }
+    vaultLastInteraction=Date.now();
+    $('#vaultMaster').value='';$('#vaultMasterConfirm').value='';
+    $('#vaultAuthForm').classList.add('hidden');$('#vaultUnlocked').classList.remove('hidden');
+    renderVaultItems();
+  }catch(err){vaultMessage(stored?'Senha mestra incorreta ou cofre danificado.':err.message||'Não foi possível criar o cofre.',true);}
+  finally{authBtn.disabled=false;}
+}
+async function commitVault(records){
+  if(!vaultKey)throw new Error('Cofre bloqueado');
+  const stored=loadPasswordVault();
+  if(!validVaultPayload(stored))throw new Error('Dados criptografados indisponíveis');
+  const next=normalizeVaultRecords(records);
+  const payload=await vaultEncrypt(next,vaultKey,vaultBase64ToBytes(stored.salt),stored.iterations);
+  localStorage.setItem(VAULT_STORAGE_KEY,JSON.stringify(payload));
+  vaultRecords=next;vaultLastInteraction=Date.now();renderVaultItems();
+}
+function resetVaultItemForm(){
+  $('#vaultPassword').type='password';$('#vaultEntryToggle').textContent='Mostrar senha digitada';$('#vaultEntryToggle').setAttribute('aria-pressed','false');
+  $('#vaultItemForm').reset();$('#vaultItemId').value='';$('#vaultSaveBtn').textContent='Salvar senha';$('#vaultCancelEdit').classList.add('hidden');
+}
+async function submitVaultItem(event){
+  event.preventDefault();if(!vaultKey){lockVault();return;}
+  const service=$('#vaultService').value.trim(),username=$('#vaultUsername').value.trim(),password=$('#vaultPassword').value;
+  if(!service||!password){vaultMessage('Informe o nome do serviço e a senha.',true);return;}
+  const editing=$('#vaultItemId').value;const now=Date.now();
+  const updated={id:editing||id(),service,username,password,updatedAt:now};
+  const next=[...vaultRecords];
+  const pos=next.findIndex(r=>r.id===editing);
+  if(pos>=0)next[pos]=updated;else next.push(updated);
+  const saveBtn=$('#vaultSaveBtn');saveBtn.disabled=true;
+  try{await commitVault(next);resetVaultItemForm();vaultMessage(editing?'Senha atualizada com segurança.':'Senha salva no cofre criptografado.');}
+  catch{vaultMessage('Falha ao salvar. Verifique o armazenamento do celular.',true);}
+  finally{saveBtn.disabled=false;}
+}
+function vaultButton(label,cls,action){const b=document.createElement('button');b.type='button';b.className=cls;b.textContent=label;b.addEventListener('click',action);return b;}
+function renderVaultItems(){
+  const list=$('#vaultItems');list.replaceChildren();
+  if(!vaultKey)return;
+  vaultCloseReveals();
+  const records=[...vaultRecords].sort((a,b)=>a.service.localeCompare(b.service,'pt-BR'));
+  $('#vaultItemsCount').textContent=`${records.length} ${records.length===1?'senha salva':'senhas salvas'}`;
+  if(!records.length){const empty=document.createElement('p');empty.className='vault-empty';empty.textContent='Nenhuma senha ainda. Use os campos acima para adicionar a primeira.';list.append(empty);return;}
+  records.forEach(item=>{
+    const card=document.createElement('article');card.className='vault-item';
+    const header=document.createElement('div');header.className='vault-item-head';
+    const title=document.createElement('strong');title.textContent=item.service;
+    const login=document.createElement('small');login.textContent=item.username||'Sem usuário informado';header.append(title,login);
+    const secretRow=document.createElement('div');secretRow.className='vault-secret-row';
+    const secret=document.createElement('span');secret.className='vault-secret';secret.textContent='••••••••';
+    const reveal=vaultButton('Mostrar','vault-mini vault-reveal',()=>{
+      vaultLastInteraction=Date.now();const open=reveal.getAttribute('aria-pressed')!=='true';
+      vaultCloseReveals();
+      if(open){secret.textContent=item.password;reveal.textContent='Ocultar';reveal.setAttribute('aria-pressed','true');
+        vaultReveals.push(setTimeout(()=>{secret.textContent='••••••••';reveal.textContent='Mostrar';reveal.setAttribute('aria-pressed','false');},12000));}
+    });
+    reveal.setAttribute('aria-pressed','false');
+    secretRow.append(secret,reveal);
+    const actions=document.createElement('div');actions.className='vault-item-actions';
+    const copyUsername=vaultButton('Copiar usuário','vault-mini',async()=>{
+      vaultLastInteraction=Date.now();try{await navigator.clipboard.writeText(item.username);toast('Usuário copiado.');}catch{vaultMessage('Não foi possível copiar o usuário.',true);}
+    });
+    if(!item.username)copyUsername.disabled=true;
+    const copyPassword=vaultButton('Copiar senha','vault-mini vault-copy',async()=>{
+      vaultLastInteraction=Date.now();try{await navigator.clipboard.writeText(item.password);toast('Senha copiada. Evite deixá-la na área de transferência.');}catch{vaultMessage('Não foi possível copiar. Use Mostrar.',true);}
+    });
+    const edit=vaultButton('Editar','vault-mini',()=>{
+      $('#vaultItemId').value=item.id;$('#vaultService').value=item.service;$('#vaultUsername').value=item.username;
+      $('#vaultPassword').value=item.password;$('#vaultSaveBtn').textContent='Salvar alterações';$('#vaultCancelEdit').classList.remove('hidden');
+      $('#vaultItemForm').scrollIntoView({behavior:'smooth',block:'center'});$('#vaultService').focus({preventScroll:true});
+    });
+    const remove=vaultButton('Excluir','vault-mini vault-delete',async()=>{
+      if(!confirm(`Excluir definitivamente a senha de ${item.service}?`))return;
+      try{await commitVault(vaultRecords.filter(v=>v.id!==item.id));resetVaultItemForm();vaultMessage('Senha excluída do cofre.');}
+      catch{vaultMessage('Não foi possível excluir.',true);}
+    });
+    actions.append(copyUsername,copyPassword,edit,remove);card.append(header,secretRow,actions);list.append(card);
+  });
+}
+function bindVaultEvents(){
+  $('#vaultToggle').addEventListener('click',toggleVault);
+  $('#vaultAuthForm').addEventListener('submit',submitVaultAuth);
+  $('#vaultItemForm').addEventListener('submit',submitVaultItem);
+  $('#vaultCancelEdit').addEventListener('click',resetVaultItemForm);
+  $('#vaultLockBtn').addEventListener('click',()=>lockVault());
+  $('#vaultEntryToggle').addEventListener('click',()=>{const input=$('#vaultPassword'),show=input.type==='password';input.type=show?'text':'password';$('#vaultEntryToggle').textContent=show?'Ocultar senha digitada':'Mostrar senha digitada';$('#vaultEntryToggle').setAttribute('aria-pressed',String(show));});
+  document.addEventListener('pointerdown',()=>{if(vaultKey)vaultLastInteraction=Date.now();},{passive:true});
+  document.addEventListener('keydown',()=>{if(vaultKey)vaultLastInteraction=Date.now();});
+  document.addEventListener('visibilitychange',()=>{
+    if(document.hidden){vaultHiddenAt=Date.now();vaultCloseReveals();}
+    else if(vaultKey && vaultHiddenAt && Date.now()-vaultHiddenAt>60000)lockVault('Cofre bloqueado por segurança.');
+  });
+  window.addEventListener('pagehide',()=>lockVault());
+  setInterval(()=>{if(vaultKey && Date.now()-vaultLastInteraction>5*60*1000)lockVault('Cofre bloqueado após 5 minutos sem uso.');},15000);
+  updateVaultAuthMode();
+}
+
 function bindEvents(){
   $$('[data-action]').forEach(b=>b.addEventListener('click',()=>openEntry(b.dataset.action)));
   $$('[data-close]').forEach(b=>b.addEventListener('click',()=>$('#'+b.dataset.close).close()));
@@ -386,7 +574,11 @@ function bindEvents(){
   $('#restoreBtn').addEventListener('click',()=>$('#restoreFile').click());
   $('#restoreFile').addEventListener('change',async e=>{
     const file=e.target.files?.[0];e.target.value='';if(!file)return;if(file.size>5*1024*1024){toast('O backup excede o limite de 5 MB.');return;}
-    try{const parsed=JSON.parse(await file.text());if(!parsed||!Array.isArray(parsed.entries)||!parsed.journey){throw new Error('Formato de backup inválido');}if(!confirm('Restaurar este backup? Isso substituirá os dados atuais do aplicativo.'))return;state=normalize(parsed);applyFontScale();persist();$('#settingsDialog').close();showView('home');toast('Backup restaurado com sucesso.');}catch{toast('Arquivo inválido. Selecione um backup LucroKM (.json).');}
+    try{const parsed=JSON.parse(await file.text());if(!parsed||!Array.isArray(parsed.entries)||!parsed.journey){throw new Error('Formato de backup inválido');}if(!confirm('Restaurar este backup? Isso substituirá os dados atuais do aplicativo.'))return;if(parsed.passwordVault!==undefined && !validVaultPayload(parsed.passwordVault))throw new Error('Cofre do backup inválido');
+    const previousVault=localStorage.getItem(VAULT_STORAGE_KEY);
+    if(parsed.passwordVault!==undefined){localStorage.setItem(VAULT_STORAGE_KEY,JSON.stringify(parsed.passwordVault));}
+    try{state=normalize(parsed);applyFontScale();persist();}catch(error){if(parsed.passwordVault!==undefined){if(previousVault===null)localStorage.removeItem(VAULT_STORAGE_KEY);else localStorage.setItem(VAULT_STORAGE_KEY,previousVault);}throw error;}
+    lockVault('Cofre bloqueado após restaurar o backup.');$('#settingsDialog').close();showView('home');toast('Backup restaurado. Senhas protegidas continuam exigindo a senha mestra.');}catch{toast('Arquivo inválido. Selecione um backup LucroKM (.json).');}
   });
   $('#clearBtn').addEventListener('click',()=>{if(!confirm('Excluir permanentemente TODOS os registros financeiros de hoje? Faça backup antes de continuar.'))return;state.entries=state.entries.filter(e=>e.date!==dateKey());persist();toast('Registros de hoje excluídos.');});
   $('#seedBtn').addEventListener('click',()=>{if(!confirm('Adicionar registros fictícios para demonstração? Eles entram no cálculo de hoje.'))return;const now=Date.now(),today=dateKey();[['income',228.40,'Uber'],['fuel',100,'Gasolina'],['income',141.80,'99'],['expense',24.50,'Alimentação'],['income',72,'Particular']].forEach(([type,value,category],i)=>state.entries.push({id:id(),type,value,category,note:'Exemplo (pode excluir)',liters:type==='fuel'?16.18:0,price:type==='fuel'?6.18:0,date:today,ts:now-(i+1)*500000}));persist();$('#settingsDialog').close();toast('Dados de exemplo inseridos.');});
@@ -396,8 +588,8 @@ function bindEvents(){
   window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();deferredInstallPrompt=event;updateInstallUI();});
   window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;updateInstallUI();toast('LucroKM instalado no dispositivo!');});
 }
-function setupServiceWorker(){if(!('serviceWorker' in navigator)||!window.isSecureContext)return;navigator.serviceWorker.register('./sw.js?v=2.9.0',{updateViaCache:'none'}).catch(()=>{});}
-applyFontScale();setGreeting();reportDateInit();resetManualNoteForm();bindEvents();updateInstallUI();renderAll();setupServiceWorker();
+function setupServiceWorker(){if(!('serviceWorker' in navigator)||!window.isSecureContext)return;navigator.serviceWorker.register('./sw.js?v=2.11.0',{updateViaCache:'none'}).catch(()=>{});}
+applyFontScale();setGreeting();reportDateInit();resetManualNoteForm();bindEvents();bindVaultEvents();updateInstallUI();renderAll();setupServiceWorker();
 setInterval(()=>{renderStats();const h=new Date().getHours();if(h===0||h===12) setGreeting();},1000);
 // Recalcular o painel quando o app retorna ao primeiro plano ou muda o dia.
 let lastDate=dateKey();document.addEventListener('visibilitychange',()=>{if(!document.hidden){renderAll();setGreeting();}});

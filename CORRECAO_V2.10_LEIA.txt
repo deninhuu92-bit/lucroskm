@@ -1,0 +1,15 @@
+LucroKM v2.10 — Correção do lucro por hora
+
+O indicador deixa de projetar um faturamento por hora enquanto a jornada tem menos de 1 hora.
+Antes de uma hora: aparece '—' e a mensagem 'Disponível após 1h de jornada'.
+Depois de uma hora: lucro estimado dividido pelas horas reais registradas.
+A mesma regra foi aplicada ao total por hora nos Relatórios.
+
+Exemplo: R$ 290 de faturamento, 5% de reserva e nenhuma outra despesa = R$ 275,50 estimados.
+Com 8 horas registradas: R$ 34,44 por hora.
+
+Importante: o indicador depende de ter a jornada iniciada e registrada no LucroKM.
+Seu dinheiro não muda; apenas a forma de exibir a métrica por hora foi corrigida.
+
+Atualização: extraia o ZIP e envie todos os arquivos da raiz para a raiz do repositório GitHub.
+Faça backup antes de atualizar e mantenha o mesmo domínio e origem do aplicativo.

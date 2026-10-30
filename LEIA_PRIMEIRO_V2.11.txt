@@ -1,0 +1,23 @@
+LucroKM v2.11 — Anotações + Senhas
+
+- As Anotações Manuais continuam iguais.
+- Na seção de anotações, toque em "Abrir" ao lado de "Senhas".
+- Na primeira utilização, crie uma senha mestra com no mínimo 12 caracteres.
+- Adicione nome do site/app, usuário (opcional) e senha.
+- Depois é possível mostrar, copiar usuário e senha, editar e excluir as senhas.
+- O cofre é criptografado com AES-GCM 256 bits e chave derivada por PBKDF2-SHA256 (310.000 iterações).
+- A senha mestra não é salva. Se esquecê-la, NÃO é possível recuperar os dados.
+- O cofre bloqueia após 5 minutos de inatividade; ao fechar ou atualizar a aba ele bloqueia.
+- Senhas são armazenadas localmente cifradas; sem sincronização entre celulares.
+- Backups JSON incluem o cofre somente criptografado. Restaure e desbloqueie com a mesma senha mestra.
+- Anotações comuns NÃO são criptografadas: nunca digite senhas nelas.
+- Precisa de HTTPS (Vercel) para usar o cofre.
+- Para senhas bancárias e contas importantes, prefira um gerenciador de senhas dedicado, com auditoria de segurança.
+
+ATUALIZAR GITHUB E VERCEL
+1. Faça um backup dos registros atuais no LucroKM.
+2. Extraia o ZIP e selecione TODOS os arquivos extraídos.
+3. No GitHub, abra seu repositório lucroskm e envie todos para a RAIZ, substituindo os anteriores.
+4. Confirme Commit changes e aguarde Deployment Ready no Vercel.
+5. Abra o endereço HTTPS e teste criando uma senha fictícia.
+6. Não limpe dados do site nem desinstale o aplicativo antes de assegurar que seus backups funcionam.
