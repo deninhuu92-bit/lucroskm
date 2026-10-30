@@ -16,19 +16,19 @@
   "theme_color": "#0b0d10",
   "icons": [
     {
-      "src": "./icons/lkm-app-192-v27.png",
+      "src": "./lkm-app-192-v28.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "./icons/lkm-app-512-v27.png",
+      "src": "./lkm-app-512-v28.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "./icons/lkm-maskable-512-v27.png",
+      "src": "./lkm-maskable-512-v28.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
