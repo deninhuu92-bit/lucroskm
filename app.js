@@ -525,6 +525,87 @@ function bindVaultEvents(){
   updateVaultAuthMode();
 }
 
+
+// v2.13 — Corrigir hora de início ou lançar jornada esquecida, sem rastreamento automático.
+const JOURNEY_REMINDER_KEY='lucrokm_journey_reminder_day';
+function toLocalDateTime(timestamp){
+  const d=new Date(timestamp);
+  const p=n=>String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function fromLocalDateTime(value){
+  if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value||''))return NaN;
+  const timestamp=new Date(value).getTime();
+  return Number.isFinite(timestamp)&&toLocalDateTime(timestamp)===value?timestamp:NaN;
+}
+function startJourneyAt(timestamp=Date.now(),km=0){
+  if(state.journey.active){toast('Já existe uma jornada em andamento.');return;}
+  state.journey={active:true,startedAt:timestamp,elapsed:0,km,date:dateKey(timestamp)};
+  persist();toast('Jornada iniciada e horário salvo.');
+}
+function maybeRemindJourneyOnIncome(type,old,date){
+  if(type!=='income'||old||date!==dateKey()||state.journey.active)return;
+  let reminded=false;
+  try{reminded=localStorage.getItem(JOURNEY_REMINDER_KEY)===date;}catch{}
+  if(reminded)return;
+  // Não interrompe lançamentos após uma jornada concluída no dia.
+  if(state.journeys.some(j=>dateKey(j.endedAt)===date))return;
+  try{localStorage.setItem(JOURNEY_REMINDER_KEY,date);}catch{}
+  const dialog=$('#journeyReminderDialog');
+  if(dialog&&!dialog.open)dialog.showModal();
+}
+function openRetroJourney(){
+  const active=Boolean(state.journey.active);
+  $('#retroJourneyTitle').textContent=active?'Corrigir o início da jornada':'Esqueci de iniciar a jornada';
+  $('#retroJourneyHelp').textContent=active?'Ajuste a hora real de início da jornada em andamento.':'Informe quando começou. Se já terminou, registre também a hora final.';
+  $('#retroStart').value=toLocalDateTime(active?state.journey.startedAt:Date.now());
+  $('#retroEnd').value='';
+  $('#retroEndGroup').classList.toggle('hidden',active);
+  $('#retroKm').value=active&&state.journey.km?String(state.journey.km).replace('.',','):'';
+  $('#retroSaveBtn').textContent=active?'Corrigir horário':'Salvar jornada';
+  $('#retroError').textContent='';$('#retroError').classList.add('hidden');
+  $('#retroJourneyDialog').showModal();
+}
+function saveRetroJourney(event){
+  event.preventDefault();
+  const start=fromLocalDateTime($('#retroStart').value);
+  const active=Boolean(state.journey.active);
+  const endValue=active?'':$('#retroEnd').value;
+  const end=endValue?fromLocalDateTime(endValue):Date.now();
+  const rawKm=$('#retroKm').value;
+  const km=rawKm.trim()?inputNumber(rawKm):(active?state.journey.km:0);
+  const err=$('#retroError');
+  const fail=message=>{err.textContent=message;err.classList.remove('hidden');};
+  if(!Number.isFinite(start)||!Number.isFinite(end)||start>Date.now()+60000||end>Date.now()+60000||end<=start){fail('Confira os horários: o início deve ser anterior ao término, sem datas futuras.');return;}
+  if(end-start>48*60*60*1000){fail('Cada jornada deve ter até 48 horas. Confira as datas ou divida em duas jornadas.');return;}
+  if(!Number.isFinite(km)||km<0||km>1000000){fail('Informe uma quilometragem válida.');return;}
+  const existingOverlap=state.journeys.some(j=>start<j.endedAt&&end>j.startedAt);
+  if(existingOverlap){fail('Já existe uma jornada neste intervalo. Ajuste as datas para evitar horas duplicadas.');return;}
+  if(active){
+    state.journey.startedAt=start;
+    state.journey.date=dateKey(start);
+    state.journey.elapsed=0;
+    state.journey.km=km;
+  }else if(endValue){
+    state.journeys.push({id:id(),startedAt:start,endedAt:end,seconds:Math.round((end-start)/1000),elapsed:0,km,date:dateKey(start)});
+  }else{
+    state.journey={active:true,startedAt:start,elapsed:0,km,date:dateKey(start)};
+  }
+  $('#retroJourneyDialog').close();persist();
+  toast(active?'Horário da jornada corrigido.':endValue?'Jornada anterior registrada no histórico.':'Jornada iniciada com o horário informado.');
+}
+function bindJourneyIntelligence(){
+  $('#forgotJourneyBtn').addEventListener('click',openRetroJourney);
+  $('#retroJourneyClose').addEventListener('click',()=>$('#retroJourneyDialog').close());
+  $('#retroJourneyForm').addEventListener('submit',saveRetroJourney);
+  $$('[data-retro-minutes]').forEach(btn=>btn.addEventListener('click',()=>{
+    $('#retroStart').value=toLocalDateTime(Date.now()-Number(btn.dataset.retroMinutes)*60000);
+  }));
+  $('#reminderStartNow').addEventListener('click',()=>{$('#journeyReminderDialog').close();startJourneyAt();});
+  $('#reminderAdjustTime').addEventListener('click',()=>{$('#journeyReminderDialog').close();openRetroJourney();});
+  $('#reminderDismiss').addEventListener('click',()=>$('#journeyReminderDialog').close());
+}
+
 function bindEvents(){
   $$('[data-action]').forEach(b=>b.addEventListener('click',()=>openEntry(b.dataset.action)));
   $$('[data-close]').forEach(b=>b.addEventListener('click',()=>$('#'+b.dataset.close).close()));
@@ -549,7 +630,7 @@ function bindEvents(){
     resetManualNoteForm();persist();toast(old?'Anotação atualizada.':'Anotação salva no celular.');
   });
   $('#journeyBtn').addEventListener('click',()=>{
-    if(!state.journey.active){state.journey={active:true,startedAt:Date.now(),elapsed:0,km:0,date:dateKey()};persist();toast('Jornada iniciada. Boa viagem!');}
+    if(!state.journey.active){startJourneyAt();}
     else{$('#finishKm').value=state.journey.km?String(state.journey.km).replace('.',','):'';$('#finishDialog').showModal();}
   });
   $('#finishForm').addEventListener('submit',e=>{e.preventDefault();const km=inputNumber($('#finishKm').value);if(!Number.isFinite(km)||km<0||km>1000000){toast('Informe uma quilometragem válida.');return;}const j=state.journey;if(!j.active)return;const end=Date.now();const total=elapsedSeconds();state.journeys.push({id:id(),startedAt:j.startedAt,endedAt:end,seconds:total,elapsed:j.elapsed||0,km,date:j.date});state.journey={active:false,startedAt:null,elapsed:0,km:0,date:dateKey()};$('#finishDialog').close();persist();toast('Jornada finalizada e salva.');});
@@ -564,6 +645,7 @@ function bindEvents(){
     const record={id:old?.id||id(),type,value,category:$('#entryCategory').value,note:$('#entryNote').value.trim(),liters,price,date,ts:old?.ts||Date.now()};
     if(old)Object.assign(old,record);else state.entries.push(record);
     $('#entryDialog').close();persist();toast(old?'Registro atualizado.':'Registro adicionado.');
+    maybeRemindJourneyOnIncome(type,old,date);
   });
   $('#settingsForm').addEventListener('submit',e=>{e.preventDefault();const maint=inputNumber($('#maintenanceInput').value);if(!Number.isFinite(maint)||maint<0||maint>50){toast('Informe uma reserva entre 0% e 50%.');return;}state.maintenanceRate=maint;$('#settingsDialog').close();persist();toast('Configurações salvas.');});
   $('#vehicleForm').addEventListener('submit',e=>{e.preventDefault();const cost=inputNumber($('#costPerKm').value);if(!Number.isFinite(cost)||cost<0||cost>100){toast('Informe um custo por km válido.');return;}state.costPerKm=cost;state.vehicle={name:$('#vehicleName').value.trim(),plate:$('#vehiclePlate').value.trim().toUpperCase()};persist();toast('Dados do veículo salvos.');});
@@ -588,8 +670,8 @@ function bindEvents(){
   window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();deferredInstallPrompt=event;updateInstallUI();});
   window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;updateInstallUI();toast('LucroKM instalado no dispositivo!');});
 }
-function setupServiceWorker(){if(!('serviceWorker' in navigator)||!window.isSecureContext)return;navigator.serviceWorker.register('./sw.js?v=2.11.0',{updateViaCache:'none'}).catch(()=>{});}
-applyFontScale();setGreeting();reportDateInit();resetManualNoteForm();bindEvents();bindVaultEvents();updateInstallUI();renderAll();setupServiceWorker();
+function setupServiceWorker(){if(!('serviceWorker' in navigator)||!window.isSecureContext)return;navigator.serviceWorker.register('./sw.js?v=2.13.0',{updateViaCache:'none'}).catch(()=>{});}
+applyFontScale();setGreeting();reportDateInit();resetManualNoteForm();bindEvents();bindVaultEvents();bindJourneyIntelligence();updateInstallUI();renderAll();setupServiceWorker();
 setInterval(()=>{renderStats();const h=new Date().getHours();if(h===0||h===12) setGreeting();},1000);
 // Recalcular o painel quando o app retorna ao primeiro plano ou muda o dia.
 let lastDate=dateKey();document.addEventListener('visibilitychange',()=>{if(!document.hidden){renderAll();setGreeting();}});

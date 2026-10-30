@@ -222,3 +222,28 @@ dialog{color:var(--text);background:#15191e;border:1px solid rgba(255,255,255,.1
 .vault-item-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap}.vault-mini{padding:8px 11px;background:#253438;border:1px solid rgba(255,255,255,.09);border-radius:10px;color:#e6eeee;font-size:calc(11px * var(--font-scale));font-weight:680}.vault-copy{color:#a1ebc3}.vault-delete{color:#f4aca7}.vault-empty{color:#a5b5b5;font-size:calc(11px * var(--font-scale));line-height:1.55;padding:13px}.vault-auth-form .hidden,.vault-unlocked.hidden,.vault-panel.hidden,.vault-secondary.hidden{display:none!important}
 @media(max-width:420px){.vault-invite{gap:9px;padding:12px}.vault-invite-symbol{width:37px;height:37px;flex-basis:37px}.vault-toggle{padding:11px}.vault-panel{padding:14px}.vault-unlocked-heading{flex-wrap:wrap}}
 @media print{.vault-area{display:none!important}}
+
+
+/* v2.13 — Jornada inteligente: aviso discreto e correção manual. */
+.forgot-journey-btn{display:inline-flex;align-items:center;gap:8px;margin-top:15px;padding:9px 11px;border:1px solid rgba(245,170,104,.22);border-radius:12px;background:rgba(238,133,67,.075);color:#f5bc8d;font-size:calc(12px * var(--font-scale));font-weight:680;line-height:1.3;cursor:pointer;max-width:100%;transition:background .2s ease,border-color .2s ease}
+.forgot-journey-btn:hover{background:rgba(238,133,67,.16);border-color:rgba(245,170,104,.45)}.forgot-journey-btn:focus-visible,.retro-quick-row button:focus-visible,.smart-muted-btn:focus-visible{outline:2px solid #f4a261;outline-offset:3px}
+.smart-journey-dialog{width:min(420px,calc(100vw - 24px));max-height:min(90vh,750px);border-radius:24px;background:#151a1f;border:1px solid rgba(255,255,255,.12);color:#f2f6f9;box-shadow:0 25px 75px rgba(0,0,0,.55);padding:0;overscroll-behavior:contain}
+.smart-journey-dialog::backdrop{background:rgba(1,6,9,.82);backdrop-filter:blur(5px)}
+.smart-journey-body{padding:clamp(20px,5vw,28px);max-height:min(90vh,750px);overflow-y:auto}
+.smart-dialog-kicker{letter-spacing:.13em;font-weight:750;font-size:calc(10px * var(--font-scale));color:#edb183;margin-bottom:9px}
+.smart-journey-body h3{font-size:calc(24px * var(--font-scale));margin:0 0 10px;line-height:1.15;letter-spacing:-.045em}
+.smart-journey-body p{color:#c2ccd4;font-size:calc(13px * var(--font-scale));line-height:1.6;margin:8px 0 15px}
+.smart-journey-body>small{display:block;margin-top:14px;color:#8a99a6;font-size:calc(11px * var(--font-scale))}
+.smart-choice-stack{display:grid;gap:9px}.smart-choice-stack button{min-height:47px;width:100%;justify-content:center}
+.smart-muted-btn{border:none;background:transparent;color:#aeb8c1;padding:9px 12px;cursor:pointer;font-size:calc(12px * var(--font-scale));font-weight:700}
+.smart-journey-body label{display:block;color:#d2dce5;font-size:calc(12px * var(--font-scale));font-weight:700;margin:14px 0 8px}
+.smart-journey-body input{width:100%;max-width:100%;box-sizing:border-box;color-scheme:dark;min-height:47px;padding:11px 12px;background:#202830;color:#fff;border:1px solid rgba(255,255,255,.16);border-radius:12px;font-family:inherit;font-size:calc(14px * var(--font-scale))}
+.smart-journey-body input:focus{outline:2px solid rgba(242,140,67,.65);outline-offset:1px}
+.smart-journey-body .modal-head{align-items:center;gap:9px}.smart-journey-body .modal-head h3{margin:4px 0}.smart-journey-body .modal-head .icon-btn{flex-shrink:0}
+.retro-quick-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:10px 0 14px}
+.retro-quick-row button{padding:10px 4px;border-radius:11px;background:#273039;color:#e5c19e;border:1px solid rgba(245,170,104,.18);font-size:calc(11px * var(--font-scale));font-weight:700}
+.retro-quick-row button:active{transform:scale(.97)}
+.retro-optional{font-weight:400;color:#98aab9}.smart-journey-body #retroEndGroup>small{display:block;margin:7px 0 0;color:#96a7b6;font-size:calc(11px * var(--font-scale));line-height:1.5}
+.retro-error{padding:10px 12px;border:1px solid rgba(234,102,95,.35);background:rgba(234,102,95,.11);color:#ffaaa4;border-radius:10px;margin:12px 0;font-size:calc(12px * var(--font-scale))}
+#retroSaveBtn{margin-top:18px;min-height:48px;width:100%;justify-content:center}
+@media(prefers-reduced-motion:reduce){.forgot-journey-btn{transition:none}}

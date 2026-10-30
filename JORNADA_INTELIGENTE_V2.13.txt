@@ -1,0 +1,12 @@
+LUCROKM v2.13 — JORNADA INTELIGENTE
+
+1) Ao salvar a primeira RECEITA do dia, se não houver jornada ativa, aparece o aviso "Ganho salvo! E a jornada?" com Iniciar agora / Comecei mais cedo / Agora não. O aviso é limitado a uma vez por dia.
+2) O botão "Esqueci de iniciar / corrigir horário" fica no cartão de Jornada.
+3) Pode informar horário passado para iniciar com a hora certa.
+4) Se informar também o horário de término, salva uma jornada já concluída (e os km opcionais).
+5) Se a jornada já estiver ativa, pode corrigir seu horário inicial.
+6) Bloqueia lançamentos com datas futuras, jornadas de mais de 48h e intervalos sobrepostos com jornadas já concluídas.
+7) Não usa GPS nem inicia jornadas sozinho. Não confunde entrada de dinheiro com início real de trabalho.
+8) Lançamentos financeiros existentes, anotações e cofre de senhas são preservados na atualização no mesmo domínio.
+
+IMPORTANTE: faça backup antes de atualizar. Envie TODO o conteúdo do ZIP para a raiz do GitHub e confirme o deploy Ready no Vercel. Não limpe dados do site.
