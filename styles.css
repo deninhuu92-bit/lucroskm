@@ -164,3 +164,35 @@ dialog{color:var(--text);background:#15191e;border:1px solid rgba(255,255,255,.1
 /* v2.7 logo oficial no convite de instalação. */
 .install-banner-icon{background:transparent;border:0;overflow:hidden}
 .install-banner-icon img{width:37px;height:37px;border-radius:12px;object-fit:cover}
+
+
+/* LucroKM 2.9 — Anotações manuais, independentes do resultado financeiro. */
+.manual-notes-card{margin-top:16px;position:relative;overflow:hidden;border-radius:25px;border:1px solid rgba(245,160,89,.23);background:linear-gradient(145deg,#211e1b 0%,#181a1c 60%,#171b1e 100%);padding:clamp(19px,2.5vw,26px);box-shadow:inset 0 1px rgba(255,229,194,.05),0 14px 35px rgba(0,0,0,.15)}
+.manual-notes-card:before{content:"";position:absolute;right:-90px;top:-110px;width:300px;height:300px;background:radial-gradient(circle,rgba(245,146,67,.09),transparent 70%);pointer-events:none}
+.manual-notes-head{position:relative;display:flex;align-items:center;gap:12px;min-width:0}
+.notes-icon{width:43px;height:43px;flex:0 0 43px;display:grid;place-items:center;color:#f7a460;border-radius:14px;background:rgba(244,145,68,.12);border:1px solid rgba(247,163,91,.18)}
+.notes-heading{min-width:0;flex:1}.notes-overline{display:block;font-size:calc(9px * var(--font-scale));color:#eba96f;letter-spacing:.12em;font-weight:800}
+.notes-heading h2{margin:4px 0 0;font-size:calc(20px * var(--font-scale));line-height:1.15;letter-spacing:-.045em;font-weight:760}
+.notes-count{display:inline-flex;align-items:center;justify-content:center;padding:7px 9px;white-space:nowrap;border:1px solid rgba(245,153,82,.15);border-radius:99px;color:#f6bf97;background:rgba(241,140,62,.06);font-size:calc(10px * var(--font-scale));font-weight:700}
+.manual-notes-subtitle{position:relative;margin:16px 0 19px;color:#b7b8bc;font-size:calc(12px * var(--font-scale));line-height:1.6}
+#manualNoteForm{position:relative;display:grid;gap:11px}
+.note-date-label{display:flex;gap:12px;align-items:center;justify-content:space-between;min-width:0}
+.note-date-label label,.note-text-label{color:#dcd5cf;font-size:calc(11px * var(--font-scale));font-weight:680}
+#manualNoteDate{min-width:0;width:165px;max-width:55%;color-scheme:dark;border:1px solid rgba(255,255,255,.12);background:#222426;color:#fff5ec;border-radius:11px;min-height:43px;padding:9px 10px;font:inherit;font-size:calc(12px * var(--font-scale))}
+#manualNoteText{display:block;width:100%;min-height:112px;resize:vertical;padding:14px 15px;box-sizing:border-box;color:#f6f7f8;background:#111518;border:1px solid rgba(255,255,255,.13);border-radius:15px;line-height:1.55;font:inherit;font-size:calc(13px * var(--font-scale));transition:border-color .2s ease,box-shadow .2s ease}
+#manualNoteText::placeholder{color:#85909c;opacity:1}
+#manualNoteText:focus,#manualNoteDate:focus{outline:2px solid rgba(243,153,79,.48);outline-offset:2px;border-color:rgba(246,168,93,.44)}
+.note-footer{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.note-footer>span{font-size:calc(10px * var(--font-scale));color:#929ba4}.note-buttons{display:flex;gap:9px;align-items:center}
+.note-save,.note-cancel{border:0;border-radius:12px;padding:11px 16px;min-height:42px;font-size:calc(12px * var(--font-scale));font-weight:760;cursor:pointer;transition:transform .2s cubic-bezier(.2,.8,.2,1),background .2s ease}
+.note-save{background:linear-gradient(135deg,#f9aa5e,#ef8134);color:#1e130b;box-shadow:0 8px 18px rgba(230,119,48,.18)}.note-save:active,.note-cancel:active{transform:scale(.96)}.note-cancel{background:#2f3438;color:#f0f0f0;border:1px solid #41484d}
+.manual-notes-card button:focus-visible,.manual-note-control:focus-visible{outline:2px solid #ffbc83;outline-offset:3px}
+.notes-recent{position:relative;display:grid;gap:10px;margin-top:18px}.manual-notes-empty{padding:13px 14px;border-radius:13px;color:#9da8b3;border:1px dashed rgba(255,255,255,.13);font-size:calc(11px * var(--font-scale));line-height:1.5}
+.manual-note-item{min-width:0;border-radius:15px;padding:13px 14px;background:rgba(255,255,255,.028);border:1px solid rgba(255,255,255,.07)}
+.manual-note-heading{display:flex;gap:8px;align-items:center;color:#eac7a9}.manual-note-heading strong{font-size:calc(11px * var(--font-scale));font-weight:740;text-transform:capitalize}.manual-note-date-icon{color:#f2a363}
+.manual-note-content{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.6;color:#e8e8e8;font-size:calc(12px * var(--font-scale));margin:9px 0}
+.manual-note-controls{display:flex;align-items:center;gap:9px;justify-content:flex-end}.manual-note-control{background:#2a3035;color:#d6dfed;border:1px solid #3b454d;padding:7px 13px;border-radius:9px;font-size:calc(11px * var(--font-scale));cursor:pointer}.manual-note-control.danger{color:#ffb6a9}
+.notes-all-btn{position:relative;display:flex;align-items:center;justify-content:space-between;width:100%;margin-top:13px;background:none;border:0;border-top:1px solid rgba(255,255,255,.08);padding:15px 2px 1px;color:#ffbb87;font-size:calc(11px * var(--font-scale));font-weight:740;cursor:pointer}
+.notes-more{margin:1px 0;color:#a9b1ba;font-size:calc(11px * var(--font-scale))}.report-notes-list{display:grid;gap:11px}
+@media(max-width:730px){.manual-notes-card{order:1;margin-top:0}.journey-card{order:2}}
+@media(max-width:410px){.manual-notes-card{padding:19px 15px}.manual-notes-head{flex-wrap:wrap}.notes-count{margin-left:55px}.note-date-label{flex-direction:column;align-items:stretch;gap:7px}#manualNoteDate{max-width:100%;width:100%}.note-footer{align-items:flex-end;flex-direction:column}.note-buttons{width:100%}.note-save{flex:1}.manual-note-control{min-height:38px}}
+@media print{.manual-notes-card,.manual-note-controls,#reportNotesSection .manual-note-controls{display:none!important}}

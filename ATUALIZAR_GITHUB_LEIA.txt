@@ -1,24 +1,17 @@
-# LucroKM v2.8 — versão sem pastas (GitHub + Vercel)
+LucroKM v2.9 — ANOTAÇÕES MANUAIS (SEM PASTAS)
 
-Esta versão foi preparada para envio pelo formulário do GitHub, sem diretórios `icons/` e `assets/icons/`.
+1. Faça um backup dentro do LucroKM antes de atualizar.
+2. Extraia o ZIP. Envie todos os arquivos extraídos para a RAIZ do mesmo repositório GitHub.
+3. Substitua index.html, app.js, styles.css, sw.js e demais arquivos.
+4. Clique em Commit changes. Verifique o deployment Ready no Vercel.
+5. Reabra o aplicativo. Não limpe o armazenamento do navegador.
 
-- **Todos os arquivos do ZIP ficam na raiz.** Extraia e selecione os arquivos, não o ZIP.
-- **Ícones da interface** estão incorporados dentro do HTML e do JavaScript; por isso, não desaparecem quando faltam pastas.
-- **Logomarca oficial e ícone de instalação** são arquivos PNG na raiz, com nomes `-v28` para evitar o cache das versões anteriores.
-- Manifesto, cabeçalho, favicon e instalação fazem referência aos novos PNGs da raiz.
-- O service worker foi atualizado para `lucrokm-v2.8.0` e mantém o app offline.
-- Armazenamento financeiro segue com a mesma chave e formato: `lucrokm_state`.
+MUDANÇAS
+• Remoção total da Meta do Dia, inclusive das Configurações e dos avisos do Histórico.
+• Novo painel Anotações Manuais: texto livre e data, edição e exclusão.
+• Ver anotações nos Relatórios filtradas por período.
+• As anotações ficam no armazenamento do próprio dispositivo e entram no backup JSON.
+• As anotações não afetam os totais financeiros nem a reserva de manutenção.
+• Permanece sem pasta icons/assets; imagens na raiz, ícones incorporados.
 
-## Atualizar pelo GitHub
-
-1. Faça backup dos registros pelo LucroKM antes da atualização.
-2. Extraia o ZIP no computador.
-3. No repositório GitHub `deninhu92-bit/lucroskm` na branch `main`, clique em **Add file > Upload files**.
-4. **Selecione todos os arquivos extraídos**, juntos. Não envie o ZIP compactado e não crie uma subpasta para eles.
-5. Verifique se aparecem `index.html`, `app.js`, `styles.css`, `sw.js`, `manifest.webmanifest` e os arquivos `lkm-*-v28.png` na **raiz** do repositório.
-6. Clique em **Commit changes**. O deploy deve ser iniciado automaticamente pelo Vercel conectado.
-7. Confirme o deploy **Ready** no Vercel e veja se a nova logo está no cabeçalho e na aba do navegador.
-
-Para testar o ícone, no navegador entre em `https://SEU-SITE.vercel.app/lkm-app-192-v28.png`.
-
-Se o aplicativo já estiver instalado, o launcher do Android/iPhone pode reter o ícone anterior. Faça backup antes de tentar reinstalar, e **não limpe os dados do site**.
+VERSÃO DOS ARQUIVOS: 2.9.0
