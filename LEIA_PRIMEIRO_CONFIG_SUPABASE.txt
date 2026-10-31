@@ -1,0 +1,17 @@
+LucroKM v2.16.1 — conexão pública configurada
+
+Este pacote inclui supabase-config.js com URL pública identificada no painel Supabase: https://bjiixavsnvrchbaunnvz.supabase.co
+Confira em Supabase > Connect ou Settings > Data API se a URL corresponde ao seu projeto. Nenhuma chave privada foi colocada neste ZIP.
+
+1. No Supabase, confirme que a função lucrokm-backup foi publicada e JWT padrão está desativado.
+2. Em Edge Functions > Secrets, mantenha LKM_SETUP_SECRET (código secreto novo e não exposto) e LKM_ALLOWED_ORIGINS=https://lucroskm.vercel.app (sem / final).
+3. CONFIRA QUE O CÓDIGO LKM_SETUP_SECRET ANTERIORMENTE EXPOSTO FOI SUBSTITUÍDO.
+4. Faça backup JSON do LucroKM antes de atualizar.
+5. No GitHub, envie TODOS os arquivos deste ZIP para a raiz do repositório, substituindo os antigos (NÃO envie o ZIP como arquivo).
+6. Aguarde o deployment Ready no Vercel, abra o site no mesmo domínio https://lucroskm.vercel.app.
+7. Configurações > Proteção na nuvem > Ativar backup neste celular. Digite o código administrativo (só você).
+8. GUARDE a chave de recuperação gerada fora do celular (ela será necessária para recuperação).
+9. Confira o status Backup atualizado na nuvem e verifique se a tabela Supabase possui 1 registro após o primeiro backup.
+
+Sem internet: o LucroKM continua salvando localmente; backups pendentes enviam quando a conexão retornar.
+NÃO limpe dados do navegador ou do aplicativo. Nunca publique chaves service_role, secret keys, códigos administrativos ou chave de recuperação em GitHub/ChatGPT.
