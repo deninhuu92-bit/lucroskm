@@ -1,0 +1,9 @@
+LucroKM v2.16 — backup Supabase SEM LOGIN
+
+O cliente apenas abre o app. O responsável ativa e guarda a chave.
+
+CONFIGURAÇÃO NECESSÁRIA: veja GUIA_SUPABASE_SEM_LOGIN.md.
+A função Supabase é publicada separadamente; apenas enviar o ZIP ao Vercel NÃO liga o backup.
+Todos os arquivos do app permanecem funcionais offline mesmo sem Supabase.
+
+Cofre de Senhas mantém criptografia própria.

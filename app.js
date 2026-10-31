@@ -64,7 +64,7 @@ function openSettings(focusFont=false){
 }
 
 function toast(message){ const el=$('#toast'); el.textContent=message; el.classList.add('visible'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.remove('visible'),3500); }
-function persist(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));}catch{toast('Armazenamento cheio ou bloqueado. Faça um backup.');}renderAll();}
+function persist(){let saved=false;try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));saved=true;}catch{toast('Armazenamento cheio ou bloqueado. Faça um backup.');}renderAll();if(saved)window.dispatchEvent(new Event('lucrokm:changed'));}
 function secondsBetweenDay(start,end,day){ const from=dateOf(day).getTime(); const next=new Date(dateOf(day)); next.setDate(next.getDate()+1); return Math.max(0,Math.min(end,next.getTime())-Math.max(start,from))/1000; }
 function elapsedSeconds(){const j=state.journey; return Math.max(0,j.elapsed||0)+(j.active&&j.startedAt?Math.max(0,Date.now()-j.startedAt)/1000:0);}
 function dailySeconds(day){
@@ -458,7 +458,7 @@ async function submitVaultAuth(event){
       const salt=crypto.getRandomValues(new Uint8Array(16));
       const key=await deriveVaultKey(password,salt,VAULT_ITERATIONS);
       const initial=await vaultEncrypt([],key,salt,VAULT_ITERATIONS);
-      localStorage.setItem(VAULT_STORAGE_KEY,JSON.stringify(initial));
+      localStorage.setItem(VAULT_STORAGE_KEY,JSON.stringify(initial));window.dispatchEvent(new Event('lucrokm:changed'));
       vaultKey=key;vaultRecords=[];vaultMessage('Cofre criado e protegido. Guarde sua senha mestra.');
     }else{
       const salt=vaultBase64ToBytes(stored.salt);
@@ -480,7 +480,7 @@ async function commitVault(records){
   if(!validVaultPayload(stored))throw new Error('Dados criptografados indisponíveis');
   const next=normalizeVaultRecords(records);
   const payload=await vaultEncrypt(next,vaultKey,vaultBase64ToBytes(stored.salt),stored.iterations);
-  localStorage.setItem(VAULT_STORAGE_KEY,JSON.stringify(payload));
+  localStorage.setItem(VAULT_STORAGE_KEY,JSON.stringify(payload));window.dispatchEvent(new Event('lucrokm:changed'));
   vaultRecords=next;vaultLastInteraction=Date.now();renderVaultItems();
 }
 function resetVaultItemForm(){
@@ -720,9 +720,39 @@ function bindEvents(){
   window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();deferredInstallPrompt=event;updateInstallUI();});
   window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;updateInstallUI();toast('LucroKM instalado no dispositivo!');});
 }
-function setupServiceWorker(){if(!('serviceWorker' in navigator)||!window.isSecureContext)return;navigator.serviceWorker.register('./sw.js?v=2.14.0',{updateViaCache:'none'}).catch(()=>{});}
+function setupServiceWorker(){if(!('serviceWorker' in navigator)||!window.isSecureContext)return;navigator.serviceWorker.register('./sw.js?v=2.16.0',{updateViaCache:'none'}).catch(()=>{});}
 applyFontScale();setGreeting();reportDateInit();resetManualNoteForm();bindEvents();bindVaultEvents();bindJourneyIntelligence();updateInstallUI();renderAll();setupServiceWorker();
 setInterval(()=>{renderStats();const h=new Date().getHours();if(h===0||h===12) setGreeting();},1000);
 // Recalcular o painel quando o app retorna ao primeiro plano ou muda o dia.
 let lastDate=dateKey();document.addEventListener('visibilitychange',()=>{if(!document.hidden){renderAll();setGreeting();}});
 setInterval(()=>{if(lastDate!==dateKey()){lastDate=dateKey();renderAll();}},15000);
+
+
+// v2.15: Ponte controlada entre dados locais e backup em nuvem.
+window.LucroKMBackup = Object.freeze({
+  exportSnapshot(){
+    const vault=loadPasswordVault();
+    if(vault?.invalid)throw Error('O Cofre de Senhas está danificado. Corrija antes de enviar backup.');
+    return {schema:1, savedAt:new Date().toISOString(), state:JSON.parse(JSON.stringify(state)), passwordVault:vault||null};
+  },
+  importSnapshot(snapshot){
+    if(!snapshot||typeof snapshot!=='object'||!snapshot.state||!Array.isArray(snapshot.state.entries)||!snapshot.state.journey)throw Error('Backup inválido: dados financeiros ausentes.');
+    if(snapshot.passwordVault!=null && !validVaultPayload(snapshot.passwordVault))throw Error('O Cofre criptografado do backup é inválido.');
+    const before=this.exportSnapshot();
+    localStorage.setItem('lucrokm_backup_antes_da_nuvem',JSON.stringify(before));
+    const next=normalize(snapshot.state);
+    localStorage.setItem(STORAGE_KEY,JSON.stringify(next));
+    if(snapshot.passwordVault)localStorage.setItem(VAULT_STORAGE_KEY,JSON.stringify(snapshot.passwordVault));
+    else localStorage.removeItem(VAULT_STORAGE_KEY);
+    state=next;
+    lockVault('Cofre bloqueado. Digite sua senha mestra para desbloquear as senhas restauradas.');
+    applyFontScale();renderAll();
+    if(typeof reportDateInit==='function')reportDateInit();
+    return true;
+  },
+  hasLocalData(){
+    return Boolean(state.entries?.length || state.journeys?.length || state.manualNotes?.length || state.journey?.active ||
+      state.vehicle?.name || state.vehicle?.plate || loadPasswordVault());
+  },
+  downloadSafetyBackup(){exportBackup();}
+});
