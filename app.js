@@ -17,7 +17,7 @@ const brl = value => (Number(value)||0).toLocaleString('pt-BR',{style:'currency'
 const numberFormat = value => (Number(value)||0).toLocaleString('pt-BR',{maximumFractionDigits:2});
 const inputNumber = raw => { let s=String(raw||'').trim().replace(/\s/g,'').replace(/[R$]/g,''); if (!s) return 0; if(s.includes(',')) s=s.replace(/\./g,'').replace(',','.'); else if(/^\d{1,3}(\.\d{3})+$/.test(s)) s=s.replace(/\./g,''); const n=Number(s); return Number.isFinite(n)?n:NaN; };
 const id = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-const defaultState = () => ({schemaVersion:5, fontScale:100, maintenanceRate:5, costPerKm:0, vehicle:{name:'',plate:''}, journey:{active:false,startedAt:null,elapsed:0,km:0,date:dateKey()}, journeys:[], entries:[], manualNotes:[]});
+const defaultState = () => ({schemaVersion:7, fontScale:100, maintenanceRate:5, costPerKm:0, vehicle:{name:'',plate:''}, journey:{active:false,startedAt:null,elapsed:0,km:0,date:dateKey()}, journeys:[], entries:[], manualNotes:[]});
 const safeMoney = n => Number.isFinite(Number(n)) ? Math.max(0,Math.min(1e9,Number(n))) : 0;
 const safeText = (s,max=140) => String(s??'').slice(0,max);
 const safePercent = n => Math.min(50,Math.max(0,Number(n)||0));
@@ -29,7 +29,7 @@ function normalize(raw){
   base.costPerKm=Math.min(100,safeMoney(raw.costPerKm));
   base.vehicle={name:safeText(raw.vehicle?.name,70),plate:safeText(raw.vehicle?.plate,10)};
   if(Array.isArray(raw.manualNotes)) base.manualNotes=raw.manualNotes.slice(0,5000).filter(n=>n&&validDate(n.date)&&typeof n.text==='string'&&n.text.trim()).map(n=>({id:safeText(n.id||id(),100),date:n.date,text:safeText(n.text.trim(),1200),ts:Number(n.ts)||Date.now(),updatedAt:Number(n.updatedAt)||Number(n.ts)||Date.now()}));
-  if(Array.isArray(raw.entries)) base.entries=raw.entries.slice(0,20000).filter(e=>e && ['income','fuel','expense'].includes(e.type) && validDate(e.date) && Number(e.value)>0).map(e=>({id:safeText(e.id||id(),100),type:e.type,category:safeText(e.category,50),note:safeText(e.note),value:safeMoney(e.value),liters:safeMoney(e.liters),price:safeMoney(e.price),date:e.date,ts:Number(e.ts)||Date.now()}));
+  if(Array.isArray(raw.entries)) base.entries=raw.entries.slice(0,20000).filter(e=>e && ['income','fuel','expense'].includes(e.type) && validDate(e.date) && Number(e.value)>0).map(e=>({id:safeText(e.id||id(),100),type:e.type,category:safeText(e.category,50),note:safeText(e.note),value:safeMoney(e.value),liters:safeMoney(e.liters),price:safeMoney(e.price),date:e.date,ts:Number(e.ts)||Date.now(),maintenancePart:safeText(e.maintenancePart,90),maintenanceProblem:safeText(e.maintenanceProblem,180),maintenanceRepair:safeText(e.maintenanceRepair,180),maintenanceOdometer:safeMoney(e.maintenanceOdometer)}));
   if(Array.isArray(raw.journeys)) base.journeys=raw.journeys.slice(0,5000).filter(j=>j&&Number.isFinite(Number(j.startedAt))&&Number.isFinite(Number(j.endedAt))&&Number(j.endedAt)>=Number(j.startedAt)).map(j=>({id:safeText(j.id||id(),100),startedAt:Number(j.startedAt),endedAt:Number(j.endedAt),seconds:Math.max(0,Number(j.seconds)||0),elapsed:Math.max(0,Number(j.elapsed)||0),km:safeMoney(j.km),date:validDate(j.date)?j.date:dateKey(Number(j.startedAt))}));
   if(raw.journey && typeof raw.journey==='object'){
     const j=raw.journey;
@@ -118,8 +118,8 @@ function renderTransactions(containerSelector,entries,empty){
     const item=document.createElement('article');item.className='tx';
     const left=document.createElement('div');left.className='tx-left';
     const dot=document.createElement('div');dot.className=`tx-dot tone-${e.type==='income'?'green':e.type==='fuel'?'yellow':'red'}`;const txIcon=document.createElement('img');txIcon.src=iconSvg(categoryIcon[e.category]||icons[e.type]||'receipt');txIcon.alt='';txIcon.setAttribute('aria-hidden','true');dot.append(txIcon);
-    const info=document.createElement('div');const title=document.createElement('b');title.textContent=e.category;
-    const subtitle=document.createElement('small');subtitle.textContent=`${e.date.split('-').reverse().join('/')} · ${e.note||new Date(e.ts).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`;
+    const info=document.createElement('div');const title=document.createElement('b');title.textContent=e.category==='Manutenção' && e.maintenancePart?`Manutenção · ${e.maintenancePart}`:e.category;
+    const subtitle=document.createElement('small');subtitle.textContent=`${e.date.split('-').reverse().join('/')} · ${e.maintenanceProblem||e.note||new Date(e.ts).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`;
     info.append(title,subtitle);left.append(dot,info);
     const right=document.createElement('div');right.className='tx-right';
     const value=document.createElement('strong');value.className=`tx-value ${e.type==='income'?'plus':'minus'}`;value.textContent=`${e.type==='income'?'+':'−'} ${brl(e.value)}`;
@@ -288,10 +288,47 @@ function showView(name){
   currentView=name;
   $$('.app-view').forEach(v=>v.classList.toggle('hidden',v.id!==`${name}View`));
   $$('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===name));
-  if(name==='reports')renderReports();if(name==='vehicle')renderVehicle();
+  if(name==='reports')renderReports();if(name==='vehicle'){renderVehicle();renderMaintenanceHistory();}
   window.scrollTo({top:0,behavior:'instant'});
 }
 function renderVehicle(){ $('#vehicleName').value=state.vehicle.name;$('#vehiclePlate').value=state.vehicle.plate;$('#costPerKm').value=state.costPerKm?String(state.costPerKm).replace('.',','):''; }
+function maintenanceEntries(){return sortedEntries(state.entries.filter(e=>e.type==='expense'&&e.category==='Manutenção'));}
+function renderMaintenanceHistory(){
+  const list=$('#maintenanceHistory');if(!list)return;
+  list.replaceChildren();
+  const entries=maintenanceEntries();
+  $('#maintenanceCount').textContent=`${entries.length} ${entries.length===1?'reparo':'reparos'}`;
+  $('#maintenanceTotal').textContent=brl(entries.reduce((sum,e)=>sum+e.value,0));
+  $('#maintenanceLastPart').textContent=entries[0]?.maintenancePart|| (entries.length?'Não informada':'Nenhuma');
+  if(!entries.length){const empty=document.createElement('div');empty.className='maintenance-empty';empty.textContent='Nenhuma manutenção cadastrada. Registre a peça que apresentou defeito para consultar depois.';list.append(empty);return;}
+  for(const e of entries.slice(0,50)){
+    const card=document.createElement('article');card.className='repair-row';
+    const top=document.createElement('div');top.className='repair-top';
+    const title=document.createElement('strong');title.textContent=e.maintenancePart||'Peça não informada';
+    const amount=document.createElement('span');amount.textContent=brl(e.value);
+    top.append(title,amount);
+    const date=document.createElement('small');date.className='repair-date';date.textContent=dateOf(e.date).toLocaleDateString('pt-BR',{day:'2-digit',month:'short',year:'numeric'});
+    card.append(top,date);
+    if(e.maintenanceProblem){const p=document.createElement('p');p.className='repair-description';p.textContent=`Defeito: ${e.maintenanceProblem}`;card.append(p);}
+    if(e.maintenanceRepair){const p=document.createElement('p');p.className='repair-description';p.textContent=`Serviço: ${e.maintenanceRepair}`;card.append(p);}
+    if(e.maintenanceOdometer){const p=document.createElement('p');p.className='repair-description';p.textContent=`Odômetro: ${numberFormat(e.maintenanceOdometer)} km`;card.append(p);}
+    if(e.note){const p=document.createElement('p');p.className='repair-description repair-note';p.textContent=e.note;card.append(p);}
+    const actions=document.createElement('div');actions.className='repair-actions';
+    actions.append(makeButton('Editar','tx-control',()=>openEntry('expense',e),'Editar manutenção','pen'),makeButton('Excluir','tx-control danger',()=>deleteEntry(e.id),'Excluir manutenção','trash-can'));
+    card.append(actions);list.append(card);
+  }
+  if(entries.length>50){const extra=document.createElement('p');extra.className='maintenance-tip';extra.textContent=`Mostrando as 50 manutenções mais recentes de ${entries.length} registros. Os demais seguem no histórico financeiro.`;list.append(extra);}
+}
+function updateMaintenanceFields(){
+  const maintenance=$('#entryType').value==='expense'&&$('#entryCategory').value==='Manutenção';
+  $('#maintenanceFields').classList.toggle('hidden',!maintenance);
+  const custom=$('#maintenancePart').value==='Outra peça';
+  $('#maintenanceOtherWrap').classList.toggle('hidden',!maintenance||!custom);
+  $('#maintenancePart').required=maintenance;
+  $('#maintenanceOther').required=maintenance&&custom;
+  $('#maintenanceProblem').required=maintenance;
+}
+function addMaintenance(){openEntry('expense',null,'Manutenção');}
 function dateArray(from,to,max=366){const arr=[];const now=dateOf(from);const last=dateOf(to);for(let i=0;now<=last&&i<max;i++,now.setDate(now.getDate()+1))arr.push(dateKey(now));return arr;}
 function renderReports(){
   const from=$('#reportStart').value,to=$('#reportEnd').value;
@@ -314,24 +351,25 @@ function renderReports(){
   renderReportNotes();
 }
 
-function renderAll(){renderStats();renderHomeTransactions();renderRecentManualNotes();if(currentView==='reports')renderReports();}
+function renderAll(){renderStats();renderHomeTransactions();renderRecentManualNotes();if(currentView==='reports')renderReports();if(currentView==='vehicle')renderMaintenanceHistory();}
 function entryOptions(type){return {income:['Uber','99','Particular','Outro'],fuel:['Gasolina','Etanol','GNV','Diesel','Outro'],expense:['Alimentação','Pedágio','Estacionamento','Lavagem','Manutenção','Seguro','Aluguel','Outro']}[type]||[];}
-function openEntry(type,record=null){
+function openEntry(type,record=null,preferredCategory=null){
   const meta={income:['Receita','Registrar ganho'],fuel:['Combustível','Registrar abastecimento'],expense:['Despesa','Registrar custo']}[type];
   if(!meta)return;
   $('#entryType').value=type;$('#entryId').value=record?.id||'';
   $('#modalEyebrow').textContent=meta[0];$('#modalTitle').textContent=record?'Editar registro':meta[1];$('#entrySubmit').textContent=record?'Salvar alterações':'Salvar registro';
   const select=$('#entryCategory');select.replaceChildren();const cats=entryOptions(type);if(record?.category&&!cats.includes(record.category))cats.push(record.category);
   cats.forEach(name=>{const op=document.createElement('option');op.textContent=name;op.value=name;select.append(op);});
-  select.value=record?.category||cats[0];$('#fuelFields').classList.toggle('hidden',type!=='fuel');
+  select.value=record?.category||preferredCategory||cats[0];$('#fuelFields').classList.toggle('hidden',type!=='fuel');
+  const part=record?.maintenancePart||'';const options=[...$('#maintenancePart').options].map(o=>o.value);$('#maintenancePart').value=part&&!options.includes(part)?'Outra peça':part;$('#maintenanceOther').value=part&&!options.includes(part)?part:'';$('#maintenanceProblem').value=record?.maintenanceProblem||'';$('#maintenanceRepair').value=record?.maintenanceRepair||'';$('#maintenanceOdometer').value=record?.maintenanceOdometer?String(record.maintenanceOdometer).replace('.',','):'';updateMaintenanceFields();
   $('#entryValue').value=record?String(record.value).replace('.',','):'';$('#entryNote').value=record?.note||'';$('#fuelAmount').value=record?.liters?String(record.liters).replace('.',','):'';$('#fuelPrice').value=record?.price?String(record.price).replace('.',','):'';$('#entryDate').value=record?.date||dateKey();$('#entryError').classList.add('hidden');
   $('#entryDialog').showModal();$('#entryValue').focus();
 }
 function deleteEntry(entryId){const e=state.entries.find(e=>e.id===entryId);if(!e||!confirm(`Excluir ${e.category} (${brl(e.value)})?`))return;state.entries=state.entries.filter(e=>e.id!==entryId);persist();toast('Registro excluído.');}
 function download(name,data,type){const blob=new Blob([data],{type});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1200);}
-function exportBackup(){const payload={...state,schemaVersion:6,exportedAt:new Date().toISOString()};const vault=loadPasswordVault();if(vault?.invalid){toast('Cofre danificado; restaure um backup válido antes de exportar.');return;}if(vault)payload.passwordVault=vault;download(`lucrokm-backup-${dateKey()}.json`,JSON.stringify(payload,null,2),'application/json');toast('Backup gerado. O cofre segue criptografado. Guarde em local seguro.');}
+function exportBackup(){const payload={...state,schemaVersion:7,exportedAt:new Date().toISOString()};const vault=loadPasswordVault();if(vault?.invalid){toast('Cofre danificado; restaure um backup válido antes de exportar.');return;}if(vault)payload.passwordVault=vault;download(`lucrokm-backup-${dateKey()}.json`,JSON.stringify(payload,null,2),'application/json');toast('Backup gerado. O cofre segue criptografado. Guarde em local seguro.');}
 function csvCell(v){let s=String(v??'');if(/^[=+@\-\t\r]/.test(s))s="'"+s;return `"${s.replace(/"/g,'""')}"`;}
-function exportCsv(){const from=$('#reportStart').value,to=$('#reportEnd').value;const rows=[['Data','Tipo','Categoria','Valor (R$)','Litros','Preço por litro','Observação'],...sortedEntries(state.entries.filter(e=>e.date>=from&&e.date<=to)).map(e=>[e.date,e.type,e.category,e.value.toFixed(2).replace('.',','),e.liters||'',e.price||'',e.note])];download(`lucrokm-registros-${from}-a-${to}.csv`,'\ufeff'+rows.map(row=>row.map(csvCell).join(';')).join('\r\n'),'text/csv;charset=utf-8');toast('CSV exportado com sucesso.');}
+function exportCsv(){const from=$('#reportStart').value,to=$('#reportEnd').value;const rows=[['Data','Tipo','Categoria','Valor (R$)','Litros','Preço por litro','Observação','Peça','Defeito','Serviço realizado','Quilometragem do veículo'],...sortedEntries(state.entries.filter(e=>e.date>=from&&e.date<=to)).map(e=>[e.date,e.type,e.category,e.value.toFixed(2).replace('.',','),e.liters||'',e.price||'',e.note,e.maintenancePart||'',e.maintenanceProblem||'',e.maintenanceRepair||'',e.maintenanceOdometer||''])];download(`lucrokm-registros-${from}-a-${to}.csv`,'\ufeff'+rows.map(row=>row.map(csvCell).join(';')).join('\r\n'),'text/csv;charset=utf-8');toast('CSV exportado com sucesso.');}
 function reportDateInit(){const today=dateKey();const d=new Date();d.setDate(d.getDate()-6);$('#reportStart').value=dateKey(d);$('#reportEnd').value=today;}
 function installHelp(){
   const ios=/iPad|iPhone|iPod/.test(navigator.userAgent);
@@ -618,6 +656,9 @@ function bindEvents(){
   $('#fontUpBtn').addEventListener('click',()=>changeFontSize(1));
   $('#fontResetBtn').addEventListener('click',()=>{state.fontScale=100;applyFontScale();persist();});
   $('#seeAllBtn').addEventListener('click',()=>showView('reports'));
+  $('#addMaintenanceBtn').addEventListener('click',addMaintenance);
+  $('#entryCategory').addEventListener('change',updateMaintenanceFields);
+  $('#maintenancePart').addEventListener('change',updateMaintenanceFields);
   $('#allManualNotesBtn').addEventListener('click',()=>{showAllManualNotes=true;showView('reports');$('#reportNotesSection').scrollIntoView({behavior:'smooth',block:'start'});});
   $('#manualNoteText').addEventListener('input',()=>{$('#manualNoteCounter').textContent=`${$('#manualNoteText').value.length} / 1200 caracteres`;});
   $('#manualNoteCancel').addEventListener('click',resetManualNoteForm);
@@ -641,8 +682,17 @@ function bindEvents(){
     const error=$('#entryError');if(!Number.isFinite(value)||value<=0||value>100000000||!validDate(date)){error.textContent='Informe um valor positivo e uma data válida.';error.classList.remove('hidden');return;}
     const liters=type==='fuel'?inputNumber($('#fuelAmount').value):0,price=type==='fuel'?inputNumber($('#fuelPrice').value):0;
     if(!Number.isFinite(liters)||liters<0||!Number.isFinite(price)||price<0){error.textContent='Confira os valores de litros e preço.';error.classList.remove('hidden');return;}
+    const maintenance=type==='expense'&&$('#entryCategory').value==='Manutenção';
+    const partChoice=$('#maintenancePart').value;
+    const part=maintenance ? (partChoice==='Outra peça'?$('#maintenanceOther').value.trim():partChoice) : '';
+    const problem=maintenance?$('#maintenanceProblem').value.trim():'';
+    const odometerRaw=$('#maintenanceOdometer').value.trim();
+    const odometer=maintenance&&odometerRaw?inputNumber(odometerRaw):0;
+    if(maintenance && (!part||!problem||part.length>90||problem.length>180||!Number.isFinite(odometer)||odometer<0||odometer>5000000)){
+      error.textContent='Selecione a peça quebrada, descreva o defeito e confira a quilometragem.';error.classList.remove('hidden');return;
+    }
     const oldId=$('#entryId').value;const old=state.entries.find(e=>e.id===oldId);
-    const record={id:old?.id||id(),type,value,category:$('#entryCategory').value,note:$('#entryNote').value.trim(),liters,price,date,ts:old?.ts||Date.now()};
+    const record={id:old?.id||id(),type,value,category:$('#entryCategory').value,note:$('#entryNote').value.trim(),liters,price,date,ts:old?.ts||Date.now(),maintenancePart:part,maintenanceProblem:problem,maintenanceRepair:maintenance?$('#maintenanceRepair').value.trim():'',maintenanceOdometer:odometer};
     if(old)Object.assign(old,record);else state.entries.push(record);
     $('#entryDialog').close();persist();toast(old?'Registro atualizado.':'Registro adicionado.');
     maybeRemindJourneyOnIncome(type,old,date);
@@ -670,7 +720,7 @@ function bindEvents(){
   window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();deferredInstallPrompt=event;updateInstallUI();});
   window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;updateInstallUI();toast('LucroKM instalado no dispositivo!');});
 }
-function setupServiceWorker(){if(!('serviceWorker' in navigator)||!window.isSecureContext)return;navigator.serviceWorker.register('./sw.js?v=2.13.0',{updateViaCache:'none'}).catch(()=>{});}
+function setupServiceWorker(){if(!('serviceWorker' in navigator)||!window.isSecureContext)return;navigator.serviceWorker.register('./sw.js?v=2.14.0',{updateViaCache:'none'}).catch(()=>{});}
 applyFontScale();setGreeting();reportDateInit();resetManualNoteForm();bindEvents();bindVaultEvents();bindJourneyIntelligence();updateInstallUI();renderAll();setupServiceWorker();
 setInterval(()=>{renderStats();const h=new Date().getHours();if(h===0||h===12) setGreeting();},1000);
 // Recalcular o painel quando o app retorna ao primeiro plano ou muda o dia.

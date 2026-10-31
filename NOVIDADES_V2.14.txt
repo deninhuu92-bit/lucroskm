@@ -1,0 +1,16 @@
+LucroKM v2.14 — Manutenção por peça e anotações reposicionadas
+
+O painel principal agora exibe Anotações Manuais abaixo dos registros financeiros.
+Na aba Veículo a área Peças e manutenção aparece antes da ficha do carro.
+Botão Registrar peça quebrada: valor, peça, defeito, reparo opcional, quilometragem opcional, data.
+Os lançamentos entram uma única vez no financeiro como despesa de manutenção.
+Histórico dedicado por peça com edição e exclusão.
+As receitas, jornadas, notas e cofre existentes permanecem compatíveis.
+Backup JSON contém os detalhes, e CSV exporta colunas de peça, defeito e serviço.
+
+PUBLICAÇÃO NO GITHUB
+1. Abra o app antigo e baixe um backup primeiro.
+2. Extraia este ZIP: os arquivos estão todos na raiz, sem pastas.
+3. Envie os arquivos extraídos para a raiz do repositório, substituindo os arquivos anteriores.
+4. Faça commit e confirme Ready no Vercel.
+5. Reabra o app instalado. Não apague dados do site para forçar a atualização.
