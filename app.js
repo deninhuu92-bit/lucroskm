@@ -17,7 +17,7 @@ const brl = value => (Number(value)||0).toLocaleString('pt-BR',{style:'currency'
 const numberFormat = value => (Number(value)||0).toLocaleString('pt-BR',{maximumFractionDigits:2});
 const inputNumber = raw => { let s=String(raw||'').trim().replace(/\s/g,'').replace(/[R$]/g,''); if (!s) return 0; if(s.includes(',')) s=s.replace(/\./g,'').replace(',','.'); else if(/^\d{1,3}(\.\d{3})+$/.test(s)) s=s.replace(/\./g,''); const n=Number(s); return Number.isFinite(n)?n:NaN; };
 const id = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-const defaultState = () => ({schemaVersion:7, fontScale:100, maintenanceRate:5, costPerKm:0, vehicle:{name:'',plate:''}, journey:{active:false,startedAt:null,elapsed:0,km:0,date:dateKey()}, journeys:[], entries:[], manualNotes:[]});
+const defaultState = () => ({schemaVersion:8, fontScale:100, maintenanceRate:5, costPerKm:0, vehicle:{name:'',plate:''}, journey:{active:false,startedAt:null,elapsed:0,km:0,date:dateKey()}, journeys:[], entries:[], manualNotes:[], kmRecords:[]});
 const safeMoney = n => Number.isFinite(Number(n)) ? Math.max(0,Math.min(1e9,Number(n))) : 0;
 const safeText = (s,max=140) => String(s??'').slice(0,max);
 const safePercent = n => Math.min(50,Math.max(0,Number(n)||0));
@@ -30,10 +30,25 @@ function normalize(raw){
   base.vehicle={name:safeText(raw.vehicle?.name,70),plate:safeText(raw.vehicle?.plate,10)};
   if(Array.isArray(raw.manualNotes)) base.manualNotes=raw.manualNotes.slice(0,5000).filter(n=>n&&validDate(n.date)&&typeof n.text==='string'&&n.text.trim()).map(n=>({id:safeText(n.id||id(),100),date:n.date,text:safeText(n.text.trim(),1200),ts:Number(n.ts)||Date.now(),updatedAt:Number(n.updatedAt)||Number(n.ts)||Date.now()}));
   if(Array.isArray(raw.entries)) base.entries=raw.entries.slice(0,20000).filter(e=>e && ['income','fuel','expense'].includes(e.type) && validDate(e.date) && Number(e.value)>0).map(e=>({id:safeText(e.id||id(),100),type:e.type,category:safeText(e.category,50),note:safeText(e.note),value:safeMoney(e.value),liters:safeMoney(e.liters),price:safeMoney(e.price),date:e.date,ts:Number(e.ts)||Date.now(),maintenancePart:safeText(e.maintenancePart,90),maintenanceProblem:safeText(e.maintenanceProblem,180),maintenanceRepair:safeText(e.maintenanceRepair,180),maintenanceOdometer:safeMoney(e.maintenanceOdometer)}));
+  // Registros independentes: um total por dia, sem cronômetro.
+  if(Array.isArray(raw.kmRecords)) base.kmRecords=raw.kmRecords.slice(0,4000)
+    .filter(r=>r && validDate(r.date) && Number.isFinite(Number(r.km)) && Number(r.km)>=0 && Number(r.km)<=10000)
+    .map(r=>({date:r.date,km:Number(r.km),mode:r.mode==='odometer'?'odometer':'total',start:safeMoney(r.start),end:safeMoney(r.end),updatedAt:Number(r.updatedAt)||Date.now()}));
   if(Array.isArray(raw.journeys)) base.journeys=raw.journeys.slice(0,5000).filter(j=>j&&Number.isFinite(Number(j.startedAt))&&Number.isFinite(Number(j.endedAt))&&Number(j.endedAt)>=Number(j.startedAt)).map(j=>({id:safeText(j.id||id(),100),startedAt:Number(j.startedAt),endedAt:Number(j.endedAt),seconds:Math.max(0,Number(j.seconds)||0),elapsed:Math.max(0,Number(j.elapsed)||0),km:safeMoney(j.km),date:validDate(j.date)?j.date:dateKey(Number(j.startedAt))}));
   if(raw.journey && typeof raw.journey==='object'){
     const j=raw.journey;
     base.journey={active:Boolean(j.active)&&Number(j.startedAt)>0,startedAt:Number(j.startedAt)>0?Number(j.startedAt):null,elapsed:Math.max(0,Number(j.elapsed)||0),km:safeMoney(j.km),date:validDate(j.date)?j.date:dateKey(Number(j.startedAt)||Date.now())};
+  }
+  // Migração: se a versão antiga tinha cronômetro ativo, preservar o KM visível hoje
+  // sem continuar uma jornada oculta após a atualização/restauração.
+  if(base.journey.active){
+    const today=dateKey();
+    const previous=base.kmRecords.find(r=>r.date===today);
+    if(!previous && base.journey.km>0){
+      const oldKm=base.journeys.filter(j=>dateKey(j.endedAt)===today).reduce((n,j)=>n+j.km,0);
+      base.kmRecords.push({date:today,km:oldKm+base.journey.km,mode:'total',start:0,end:0,updatedAt:Date.now()});
+    }
+    base.journey={active:false,startedAt:null,elapsed:0,km:0,date:dateKey()};
   }
   return base;
 }
@@ -80,7 +95,9 @@ function summary(day){
   for(const e of state.entries){if(e.date!==day)continue; if(e.type==='income')revenue+=e.value;else costs+=e.value; if(e.type==='fuel'){fuel+=e.value;liters+=e.liters||0;}}
   let km=0;
   for(const j of state.journeys){if(dateKey(j.endedAt)===day)km+=j.km||0;}
-  if(state.journey.active&&day===dateKey())km+=state.journey.km||0;
+  // O registro manual substitui (não soma) KM de jornadas antigas da mesma data.
+  const override=state.kmRecords.find(r=>r.date===day);
+  if(override)km=override.km;
   const reserve=revenue*state.maintenanceRate/100;
   const kmCost=km*state.costPerKm;
   const net=revenue-costs-reserve-kmCost;
@@ -89,20 +106,21 @@ function summary(day){
 function timeFormat(seconds){const s=Math.max(0,Math.floor(seconds));return `${String(Math.floor(s/3600)).padStart(2,'0')}:${String(Math.floor(s%3600/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;}
 function setGreeting(){const h=new Date().getHours();$('#greeting').textContent=h<12?'Bom dia, motorista':h<18?'Boa tarde, motorista':'Boa noite, motorista';}
 function renderStats(){
-  const t=summary(dateKey());
-  $('#netToday').textContent=brl(t.net); $('#revenueToday').textContent=brl(t.revenue); $('#costToday').textContent=brl(t.costs+t.reserve+t.kmCost);
-  $('#perHour').textContent=hourlyRateLabel(t.net,t.hours);
-  $('#perHourHint').textContent=t.hours>=MIN_HOURS_FOR_HOURLY_RATE ? 'Lucro estimado ÷ horas trabalhadas' : 'Disponível após 1h de jornada';
-  $('#timer').textContent=timeFormat(elapsedSeconds());
-  $('#kmToday').textContent=`${numberFormat(t.km)} km`; $('#perKm').textContent=brl(t.km?t.net/t.km:0);
-  $('#fuelToday').textContent=brl(t.fuel); $('#fuelLiters').textContent=`${numberFormat(t.liters)} L registrados`;
-  $('#reserveToday').textContent=brl(t.reserve); $('#reserveHint').textContent=`${numberFormat(state.maintenanceRate)}% do faturamento`;
-  const active=state.journey.active;
-  $('#journeyStatus').textContent=active?'Rodando':'Parado';$('#journeyStatus').classList.toggle('active',active);
-  $('#journeyTitle').textContent=active?'Jornada em andamento':'Pronto para começar?';
-  $('#journeySub').textContent=active?'Seu tempo continua registrado, mesmo se fechar esta tela.':'Inicie sua jornada e acompanhe seus resultados.';
-  $('#journeyBtn .btn-label').textContent=active?'Encerrar jornada':'Iniciar jornada';$('#journeyBtn .btn-icon').src=active?iconSvg('flag-checkered'):iconSvg('play');
-  $('#kmBtn').disabled=!active;
+  const day=dateKey();
+  const t=summary(day);
+  $('#netToday').textContent=brl(t.net);
+  $('#revenueToday').textContent=brl(t.revenue);
+  $('#costToday').textContent=brl(t.costs+t.reserve+t.kmCost);
+  $('#heroKmToday').textContent=`${numberFormat(t.km)} km`;
+  $('#kmToday').textContent=`${numberFormat(t.km)} km`;
+  $('#perKm').textContent=brl(t.km?t.net/t.km:0);
+  $('#fuelToday').textContent=brl(t.fuel);
+  $('#fuelLiters').textContent=`${numberFormat(t.liters)} L registrados`;
+  $('#reserveToday').textContent=brl(t.reserve);
+  $('#reserveHint').textContent=`${numberFormat(state.maintenanceRate)}% do faturamento`;
+  $('#kmMainTotal').textContent=`${numberFormat(t.km)} km`;
+  const stored=state.kmRecords.find(r=>r.date===day);
+  $('#kmMainCaption').textContent=stored ? (stored.mode==='odometer'?'Calculado pelo KM inicial e final.':'Total anotado manualmente.') : t.km>0?'Quilometragem registrada na versão anterior.':'Ainda não anotou a quilometragem de hoje.';
 }
 function makeButton(text,cls,handler,label,iconName){
   const b=document.createElement('button');b.type='button';b.className=cls;b.setAttribute('aria-label',label);
@@ -188,12 +206,13 @@ function renderReportNotes(){
 
 function hasAnyDailyActivity(day){
   const s=summary(day);
-  return [s.revenue,s.costs,s.fuel,s.km,s.hours,s.reserve,s.kmCost].some(v=>Math.abs(Number(v)||0)>0.0001) || state.entries.some(e=>e.date===day) || state.manualNotes.some(n=>n.date===day);
+  return [s.revenue,s.costs,s.fuel,s.km,s.hours,s.reserve,s.kmCost].some(v=>Math.abs(Number(v)||0)>0.0001) || state.entries.some(e=>e.date===day) || state.manualNotes.some(n=>n.date===day) || state.kmRecords.some(r=>r.date===day);
 }
 function collectHistoryDays(){
   const set=new Set();
   state.entries.forEach(e=>{ if(validDate(e.date)) set.add(e.date); });
   state.manualNotes.forEach(n=>{if(validDate(n.date)) set.add(n.date);});
+  state.kmRecords.forEach(r=>{if(validDate(r.date)) set.add(r.date);});
   state.journeys.forEach(j=>{
     if(validDate(j.date)) set.add(j.date);
     const endDay=dateKey(j.endedAt);
@@ -244,8 +263,8 @@ function renderDailyHistory(){
     const card=document.createElement('article');
     card.className='history-card';
     const isToday=day===dateKey();
-    const onlyNotes=state.manualNotes.some(n=>n.date===day)&&!state.entries.some(e=>e.date===day)&&!state.journeys.some(j=>j.date===day||dateKey(j.endedAt)===day);
-    const statusLabel=isToday ? (state.journey.active?'Hoje · em andamento':'Hoje') : onlyNotes?'Anotações salvas':'Fechamento salvo';
+    const onlyNotes=state.manualNotes.some(n=>n.date===day)&&!state.entries.some(e=>e.date===day)&&!state.journeys.some(j=>j.date===day||dateKey(j.endedAt)===day)&&!state.kmRecords.some(r=>r.date===day);
+    const statusLabel=isToday ? 'Hoje' : onlyNotes?'Anotações salvas':'Fechamento salvo';
     const header=document.createElement('div');
     header.className='history-card-head';
     const badgeTone=isToday?'orange':'slate';
@@ -259,7 +278,7 @@ function renderDailyHistory(){
       ['Faturamento',brl(s.revenue)],
       ['Despesas',brl(s.costs+s.reserve+s.kmCost)],
       ['Km',`${numberFormat(s.km)} km`],
-      ['Jornada',timeFormat(s.hours*3600)]
+      ['Lucro por km',brl(s.km?s.net/s.km:0)]
     ];
     statsData.forEach(([label,val])=>{
       const item=document.createElement('div');
@@ -335,9 +354,9 @@ function renderReports(){
   if(!validDate(from)||!validDate(to))return;
   if(from>to){$('#reportMetrics').textContent='A data inicial deve ser anterior à data final.';$('#reportChart').replaceChildren();$('#allTransactions').replaceChildren();return;}
   const days=dateArray(from,to,400);if(!days.length||dateOf(to)-dateOf(from)>366*86400000){$('#reportMetrics').textContent='Selecione um período de até 366 dias.';return;}
-  const ss=days.map(d=>({day:d,...summary(d)}));const sum=ss.reduce((a,d)=>{for(const k of ['revenue','costs','net','km','hours','reserve','kmCost'])a[k]+=d[k];return a;},{revenue:0,costs:0,net:0,km:0,hours:0,reserve:0,kmCost:0});
-  const metrics=[['Lucro estimado',brl(sum.net)],['Faturamento',brl(sum.revenue)],['Despesas + reservas',brl(sum.costs+sum.reserve+sum.kmCost)],['Km rodados',`${numberFormat(sum.km)} km`],['Lucro por hora',hourlyRateLabel(sum.net,sum.hours)],['Lucro por km',brl(sum.km?sum.net/sum.km:0)]];
-  const m=$('#reportMetrics');m.replaceChildren();const reportIcons=[['wallet','green'],['arrow-trend-up','green'],['receipt','red'],['road','blue'],['clock','orange'],['gauge-high','violet']];
+  const ss=days.map(d=>({day:d,...summary(d)}));const sum=ss.reduce((a,d)=>{for(const k of ['revenue','costs','net','km','hours','reserve','kmCost','fuel'])a[k]+=d[k];return a;},{revenue:0,costs:0,net:0,km:0,hours:0,reserve:0,kmCost:0,fuel:0});
+  const metrics=[['Lucro estimado',brl(sum.net)],['Faturamento',brl(sum.revenue)],['Despesas + reservas',brl(sum.costs+sum.reserve+sum.kmCost)],['Km rodados',`${numberFormat(sum.km)} km`],['Combustível',brl(sum.fuel)],['Lucro por km',brl(sum.km?sum.net/sum.km:0)]];
+  const m=$('#reportMetrics');m.replaceChildren();const reportIcons=[['wallet','green'],['arrow-trend-up','green'],['receipt','red'],['road','blue'],['gas-pump','yellow'],['gauge-high','violet']];
   metrics.forEach(([label,val],index)=>{const card=document.createElement('article');card.className='report-metric';
     const s=document.createElement('span');s.className='report-label';const ico=document.createElement('span');ico.className=`report-icon tone-${reportIcons[index][1]}`;
     const img=document.createElement('img');img.src=iconSvg(reportIcons[index][0]);img.alt='';img.setAttribute('aria-hidden','true');ico.append(img);s.append(ico,document.createTextNode(label));
@@ -367,9 +386,20 @@ function openEntry(type,record=null,preferredCategory=null){
 }
 function deleteEntry(entryId){const e=state.entries.find(e=>e.id===entryId);if(!e||!confirm(`Excluir ${e.category} (${brl(e.value)})?`))return;state.entries=state.entries.filter(e=>e.id!==entryId);persist();toast('Registro excluído.');}
 function download(name,data,type){const blob=new Blob([data],{type});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1200);}
-function exportBackup(){const payload={...state,schemaVersion:7,exportedAt:new Date().toISOString()};const vault=loadPasswordVault();if(vault?.invalid){toast('Cofre danificado; restaure um backup válido antes de exportar.');return;}if(vault)payload.passwordVault=vault;download(`lucrokm-backup-${dateKey()}.json`,JSON.stringify(payload,null,2),'application/json');toast('Backup gerado. O cofre segue criptografado. Guarde em local seguro.');}
+function exportBackup(){const payload={...state,schemaVersion:8,exportedAt:new Date().toISOString()};const vault=loadPasswordVault();if(vault?.invalid){toast('Cofre danificado; restaure um backup válido antes de exportar.');return;}if(vault)payload.passwordVault=vault;download(`lucrokm-backup-${dateKey()}.json`,JSON.stringify(payload,null,2),'application/json');toast('Backup gerado. O cofre segue criptografado. Guarde em local seguro.');}
 function csvCell(v){let s=String(v??'');if(/^[=+@\-\t\r]/.test(s))s="'"+s;return `"${s.replace(/"/g,'""')}"`;}
-function exportCsv(){const from=$('#reportStart').value,to=$('#reportEnd').value;const rows=[['Data','Tipo','Categoria','Valor (R$)','Litros','Preço por litro','Observação','Peça','Defeito','Serviço realizado','Quilometragem do veículo'],...sortedEntries(state.entries.filter(e=>e.date>=from&&e.date<=to)).map(e=>[e.date,e.type,e.category,e.value.toFixed(2).replace('.',','),e.liters||'',e.price||'',e.note,e.maintenancePart||'',e.maintenanceProblem||'',e.maintenanceRepair||'',e.maintenanceOdometer||''])];download(`lucrokm-registros-${from}-a-${to}.csv`,'\ufeff'+rows.map(row=>row.map(csvCell).join(';')).join('\r\n'),'text/csv;charset=utf-8');toast('CSV exportado com sucesso.');}
+function exportCsv(){
+  const from=$('#reportStart').value,to=$('#reportEnd').value;
+  const rows=[['Data','Tipo','Categoria','Valor (R$)','Litros','Preço por litro','Observação','Peça','Defeito','Serviço realizado','Quilometragem do veículo','KM do dia','Hodômetro inicial','Hodômetro final']];
+  sortedEntries(state.entries.filter(e=>e.date>=from&&e.date<=to)).forEach(e=>rows.push([e.date,e.type,e.category,e.value.toFixed(2).replace('.',','),e.liters||'',e.price||'',e.note,e.maintenancePart||'',e.maintenanceProblem||'',e.maintenanceRepair||'',e.maintenanceOdometer||'','','','']));
+  const days=collectHistoryDays().filter(d=>d>=from&&d<=to);
+  days.forEach(day=>{
+    const record=state.kmRecords.find(r=>r.date===day),km=summary(day).km;
+    if(record||km>0)rows.push([day,'KM','Quilometragem diária','','','','Registro manual/legado (não constitui despesa)','','','','',String(km).replace('.',','),record?.mode==='odometer'?String(record.start).replace('.',','):'',record?.mode==='odometer'?String(record.end).replace('.',','):'']);
+  });
+  download(`lucrokm-registros-${from}-a-${to}.csv`,'\ufeff'+rows.map(row=>row.map(csvCell).join(';')).join('\r\n'),'text/csv;charset=utf-8');
+  toast('CSV com movimentações e quilômetros exportado.');
+}
 function reportDateInit(){const today=dateKey();const d=new Date();d.setDate(d.getDate()-6);$('#reportStart').value=dateKey(d);$('#reportEnd').value=today;}
 function installHelp(){
   const ios=/iPad|iPhone|iPod/.test(navigator.userAgent);
@@ -565,90 +595,76 @@ function bindVaultEvents(){
 
 
 // v2.13 — Corrigir hora de início ou lançar jornada esquecida, sem rastreamento automático.
-const JOURNEY_REMINDER_KEY='lucrokm_journey_reminder_day';
-function toLocalDateTime(timestamp){
-  const d=new Date(timestamp);
-  const p=n=>String(n).padStart(2,'0');
-  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+// v2.17 — Quilometragem independente do cronômetro.
+function selectKmMode(mode){
+  const value=mode==='odometer'?'odometer':'total';
+  const control=$(`input[name="kmMode"][value="${value}"]`);
+  if(control)control.checked=true;
+  $('#kmTotalField').classList.toggle('hidden',value!=='total');
+  $('#kmOdometerFields').classList.toggle('hidden',value!=='odometer');
+  $('#kmError').classList.add('hidden');
+  updateKmCalculated();
 }
-function fromLocalDateTime(value){
-  if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value||''))return NaN;
-  const timestamp=new Date(value).getTime();
-  return Number.isFinite(timestamp)&&toLocalDateTime(timestamp)===value?timestamp:NaN;
+function updateKmCalculated(){
+  const startText=$('#kmStartInput').value.trim(),endText=$('#kmEndInput').value.trim();
+  const a=inputNumber(startText),b=inputNumber(endText);
+  $('#kmCalculated').textContent=startText&&endText&&Number.isFinite(a)&&Number.isFinite(b)&&b>=a
+    ? `Diferença: ${numberFormat(b-a)} km` : 'Diferença: —';
 }
-function startJourneyAt(timestamp=Date.now(),km=0){
-  if(state.journey.active){toast('Já existe uma jornada em andamento.');return;}
-  state.journey={active:true,startedAt:timestamp,elapsed:0,km,date:dateKey(timestamp)};
-  persist();toast('Jornada iniciada e horário salvo.');
+function loadKmDate(day){
+  if(!validDate(day))return;
+  const record=state.kmRecords.find(r=>r.date===day);
+  const oldTotal=summary(day).km;
+  $('#kmTotalInput').value=record?.mode==='total'?String(record.km).replace('.',','):(!record&&oldTotal?String(oldTotal).replace('.',','):'');
+  $('#kmStartInput').value=record?.mode==='odometer'?String(record.start).replace('.',','):'';
+  $('#kmEndInput').value=record?.mode==='odometer'?String(record.end).replace('.',','):'';
+  selectKmMode(record?.mode||'total');
+  $('#kmRemoveBtn').classList.toggle('hidden',!record);
 }
-function maybeRemindJourneyOnIncome(type,old,date){
-  if(type!=='income'||old||date!==dateKey()||state.journey.active)return;
-  let reminded=false;
-  try{reminded=localStorage.getItem(JOURNEY_REMINDER_KEY)===date;}catch{}
-  if(reminded)return;
-  // Não interrompe lançamentos após uma jornada concluída no dia.
-  if(state.journeys.some(j=>dateKey(j.endedAt)===date))return;
-  try{localStorage.setItem(JOURNEY_REMINDER_KEY,date);}catch{}
-  const dialog=$('#journeyReminderDialog');
-  if(dialog&&!dialog.open)dialog.showModal();
+function openKmEditor(day=dateKey()){
+  $('#kmDate').value=validDate(day)?day:dateKey();
+  loadKmDate($('#kmDate').value);
+  $('#kmDialog').showModal();
 }
-function openRetroJourney(){
-  const active=Boolean(state.journey.active);
-  $('#retroJourneyTitle').textContent=active?'Corrigir o início da jornada':'Esqueci de iniciar a jornada';
-  $('#retroJourneyHelp').textContent=active?'Ajuste a hora real de início da jornada em andamento.':'Informe quando começou. Se já terminou, registre também a hora final.';
-  $('#retroStart').value=toLocalDateTime(active?state.journey.startedAt:Date.now());
-  $('#retroEnd').value='';
-  $('#retroEndGroup').classList.toggle('hidden',active);
-  $('#retroKm').value=active&&state.journey.km?String(state.journey.km).replace('.',','):'';
-  $('#retroSaveBtn').textContent=active?'Corrigir horário':'Salvar jornada';
-  $('#retroError').textContent='';$('#retroError').classList.add('hidden');
-  $('#retroJourneyDialog').showModal();
+function bindManualKm(){
+  $('#navKm').addEventListener('click',()=>openKmEditor());
+  $('#kmQuickBtn').addEventListener('click',()=>openKmEditor());
+  $('#kmDate').addEventListener('change',()=>loadKmDate($('#kmDate').value));
+  $$('input[name="kmMode"]').forEach(el=>el.addEventListener('change',()=>selectKmMode(el.value)));
+  $('#kmStartInput').addEventListener('input',updateKmCalculated);
+  $('#kmEndInput').addEventListener('input',updateKmCalculated);
+  $('#kmRemoveBtn').addEventListener('click',()=>{
+    const day=$('#kmDate').value;
+    if(!validDate(day)||!state.kmRecords.some(r=>r.date===day))return;
+    if(!confirm('Apagar o KM manual deste dia? O histórico de jornadas antigas, se existir, continua preservado.'))return;
+    state.kmRecords=state.kmRecords.filter(r=>r.date!==day);
+    $('#kmDialog').close();persist();toast('Registro manual apagado.');
+  });
+  $('#kmForm').addEventListener('submit',event=>{
+    event.preventDefault();
+    const day=$('#kmDate').value;
+    const mode=$('input[name="kmMode"]:checked')?.value||'total';
+    const aText=$('#kmStartInput').value.trim(),bText=$('#kmEndInput').value.trim();
+    const valueText=$('#kmTotalInput').value.trim();
+    const a=inputNumber(aText),b=inputNumber(bText);
+    const km=mode==='odometer'?b-a:inputNumber(valueText);
+    const fail=message=>{$('#kmError').textContent=message;$('#kmError').classList.remove('hidden');};
+    if(!validDate(day)){fail('Selecione uma data válida.');return;}
+    if(mode==='odometer'&&(!aText||!bText||!Number.isFinite(a)||!Number.isFinite(b)||a<0||b<a||b>5000000)){
+      fail('Confira os números: o KM final deve ser maior ou igual ao inicial.');return;
+    }
+    if(mode==='total'&&!valueText){fail('Digite quantos quilômetros rodou.');return;}
+    if(!Number.isFinite(km)||km<0||km>10000){fail('Informe uma quilometragem válida, de 0 a 10.000 km.');return;}
+    const record={date:day,km:Math.round(km*100)/100,mode,start:mode==='odometer'?a:0,end:mode==='odometer'?b:0,updatedAt:Date.now()};
+    const idx=state.kmRecords.findIndex(r=>r.date===day);
+    if(idx>=0)state.kmRecords[idx]=record;else state.kmRecords.push(record);
+    $('#kmDialog').close();persist();toast('KM do dia salvo.');
+  });
 }
-function saveRetroJourney(event){
-  event.preventDefault();
-  const start=fromLocalDateTime($('#retroStart').value);
-  const active=Boolean(state.journey.active);
-  const endValue=active?'':$('#retroEnd').value;
-  const end=endValue?fromLocalDateTime(endValue):Date.now();
-  const rawKm=$('#retroKm').value;
-  const km=rawKm.trim()?inputNumber(rawKm):(active?state.journey.km:0);
-  const err=$('#retroError');
-  const fail=message=>{err.textContent=message;err.classList.remove('hidden');};
-  if(!Number.isFinite(start)||!Number.isFinite(end)||start>Date.now()+60000||end>Date.now()+60000||end<=start){fail('Confira os horários: o início deve ser anterior ao término, sem datas futuras.');return;}
-  if(end-start>48*60*60*1000){fail('Cada jornada deve ter até 48 horas. Confira as datas ou divida em duas jornadas.');return;}
-  if(!Number.isFinite(km)||km<0||km>1000000){fail('Informe uma quilometragem válida.');return;}
-  const existingOverlap=state.journeys.some(j=>start<j.endedAt&&end>j.startedAt);
-  if(existingOverlap){fail('Já existe uma jornada neste intervalo. Ajuste as datas para evitar horas duplicadas.');return;}
-  if(active){
-    state.journey.startedAt=start;
-    state.journey.date=dateKey(start);
-    state.journey.elapsed=0;
-    state.journey.km=km;
-  }else if(endValue){
-    state.journeys.push({id:id(),startedAt:start,endedAt:end,seconds:Math.round((end-start)/1000),elapsed:0,km,date:dateKey(start)});
-  }else{
-    state.journey={active:true,startedAt:start,elapsed:0,km,date:dateKey(start)};
-  }
-  $('#retroJourneyDialog').close();persist();
-  toast(active?'Horário da jornada corrigido.':endValue?'Jornada anterior registrada no histórico.':'Jornada iniciada com o horário informado.');
-}
-function bindJourneyIntelligence(){
-  $('#forgotJourneyBtn').addEventListener('click',openRetroJourney);
-  $('#retroJourneyClose').addEventListener('click',()=>$('#retroJourneyDialog').close());
-  $('#retroJourneyForm').addEventListener('submit',saveRetroJourney);
-  $$('[data-retro-minutes]').forEach(btn=>btn.addEventListener('click',()=>{
-    $('#retroStart').value=toLocalDateTime(Date.now()-Number(btn.dataset.retroMinutes)*60000);
-  }));
-  $('#reminderStartNow').addEventListener('click',()=>{$('#journeyReminderDialog').close();startJourneyAt();});
-  $('#reminderAdjustTime').addEventListener('click',()=>{$('#journeyReminderDialog').close();openRetroJourney();});
-  $('#reminderDismiss').addEventListener('click',()=>$('#journeyReminderDialog').close());
-}
-
 function bindEvents(){
   $$('[data-action]').forEach(b=>b.addEventListener('click',()=>openEntry(b.dataset.action)));
   $$('[data-close]').forEach(b=>b.addEventListener('click',()=>$('#'+b.dataset.close).close()));
   $$('[data-view]').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.view)));
-  $('#navJourney').addEventListener('click',()=>{showView('home');$('#journeySection').scrollIntoView({behavior:'smooth',block:'center'});});
   $('#navAdd').addEventListener('click',()=>openEntry('income'));
   $('#settingsBtn').addEventListener('click',()=>openSettings());
   $('#fontTopBtn').addEventListener('click',()=>openSettings(true));
@@ -670,13 +686,6 @@ function bindEvents(){
     else state.manualNotes.push({id:id(),date,text,ts:now,updatedAt:now});
     resetManualNoteForm();persist();toast(old?'Anotação atualizada.':'Anotação salva no celular.');
   });
-  $('#journeyBtn').addEventListener('click',()=>{
-    if(!state.journey.active){startJourneyAt();}
-    else{$('#finishKm').value=state.journey.km?String(state.journey.km).replace('.',','):'';$('#finishDialog').showModal();}
-  });
-  $('#finishForm').addEventListener('submit',e=>{e.preventDefault();const km=inputNumber($('#finishKm').value);if(!Number.isFinite(km)||km<0||km>1000000){toast('Informe uma quilometragem válida.');return;}const j=state.journey;if(!j.active)return;const end=Date.now();const total=elapsedSeconds();state.journeys.push({id:id(),startedAt:j.startedAt,endedAt:end,seconds:total,elapsed:j.elapsed||0,km,date:j.date});state.journey={active:false,startedAt:null,elapsed:0,km:0,date:dateKey()};$('#finishDialog').close();persist();toast('Jornada finalizada e salva.');});
-  $('#kmBtn').addEventListener('click',()=>{if(!state.journey.active)return;$('#currentKm').value=state.journey.km?String(state.journey.km).replace('.',','):'';$('#kmDialog').showModal();});
-  $('#kmForm').addEventListener('submit',e=>{e.preventDefault();const km=inputNumber($('#currentKm').value);if(!Number.isFinite(km)||km<0||km>1000000){toast('Informe uma quilometragem válida.');return;}state.journey.km=km;$('#kmDialog').close();persist();toast('Quilometragem atualizada.');});
   $('#entryForm').addEventListener('submit',e=>{
     e.preventDefault();const type=$('#entryType').value;const value=inputNumber($('#entryValue').value);const date=$('#entryDate').value;
     const error=$('#entryError');if(!Number.isFinite(value)||value<=0||value>100000000||!validDate(date)){error.textContent='Informe um valor positivo e uma data válida.';error.classList.remove('hidden');return;}
@@ -695,7 +704,6 @@ function bindEvents(){
     const record={id:old?.id||id(),type,value,category:$('#entryCategory').value,note:$('#entryNote').value.trim(),liters,price,date,ts:old?.ts||Date.now(),maintenancePart:part,maintenanceProblem:problem,maintenanceRepair:maintenance?$('#maintenanceRepair').value.trim():'',maintenanceOdometer:odometer};
     if(old)Object.assign(old,record);else state.entries.push(record);
     $('#entryDialog').close();persist();toast(old?'Registro atualizado.':'Registro adicionado.');
-    maybeRemindJourneyOnIncome(type,old,date);
   });
   $('#settingsForm').addEventListener('submit',e=>{e.preventDefault();const maint=inputNumber($('#maintenanceInput').value);if(!Number.isFinite(maint)||maint<0||maint>50){toast('Informe uma reserva entre 0% e 50%.');return;}state.maintenanceRate=maint;$('#settingsDialog').close();persist();toast('Configurações salvas.');});
   $('#vehicleForm').addEventListener('submit',e=>{e.preventDefault();const cost=inputNumber($('#costPerKm').value);if(!Number.isFinite(cost)||cost<0||cost>100){toast('Informe um custo por km válido.');return;}state.costPerKm=cost;state.vehicle={name:$('#vehicleName').value.trim(),plate:$('#vehiclePlate').value.trim().toUpperCase()};persist();toast('Dados do veículo salvos.');});
@@ -720,9 +728,9 @@ function bindEvents(){
   window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();deferredInstallPrompt=event;updateInstallUI();});
   window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;updateInstallUI();toast('LucroKM instalado no dispositivo!');});
 }
-function setupServiceWorker(){if(!('serviceWorker' in navigator)||!window.isSecureContext)return;navigator.serviceWorker.register('./sw.js?v=2.16.0',{updateViaCache:'none'}).catch(()=>{});}
-applyFontScale();setGreeting();reportDateInit();resetManualNoteForm();bindEvents();bindVaultEvents();bindJourneyIntelligence();updateInstallUI();renderAll();setupServiceWorker();
-setInterval(()=>{renderStats();const h=new Date().getHours();if(h===0||h===12) setGreeting();},1000);
+function setupServiceWorker(){if(!('serviceWorker' in navigator)||!window.isSecureContext)return;navigator.serviceWorker.register('./sw.js?v=2.17.0',{updateViaCache:'none'}).catch(()=>{});}
+applyFontScale();setGreeting();reportDateInit();resetManualNoteForm();bindEvents();bindVaultEvents();bindManualKm();updateInstallUI();renderAll();setupServiceWorker();
+setInterval(()=>{const h=new Date().getHours();if(h===0||h===12)setGreeting();},60000);
 // Recalcular o painel quando o app retorna ao primeiro plano ou muda o dia.
 let lastDate=dateKey();document.addEventListener('visibilitychange',()=>{if(!document.hidden){renderAll();setGreeting();}});
 setInterval(()=>{if(lastDate!==dateKey()){lastDate=dateKey();renderAll();}},15000);
@@ -751,7 +759,7 @@ window.LucroKMBackup = Object.freeze({
     return true;
   },
   hasLocalData(){
-    return Boolean(state.entries?.length || state.journeys?.length || state.manualNotes?.length || state.journey?.active ||
+    return Boolean(state.entries?.length || state.journeys?.length || state.manualNotes?.length || state.kmRecords?.length || state.journey?.active ||
       state.vehicle?.name || state.vehicle?.plate || loadPasswordVault());
   },
   downloadSafetyBackup(){exportBackup();}

@@ -1,0 +1,24 @@
+LucroKM v2.17 — KM manual (sem iniciar jornada)
+
+NOVO
+- A tela de jornada e o cronômetro foram removidos da interface.
+- Botão KM abre um registro simples do total rodado no dia.
+- Alternativa de calcular a diferença do hodômetro inicial e final.
+- Pode selecionar data anterior e corrigir ou apagar um registro de KM.
+- KM aparece no histórico, relatório por período e cálculo de lucro por km.
+- Registro manual SUBSTITUI a quilometragem antiga daquele dia, sem somar duas vezes.
+- Registros históricos de jornadas anteriores continuam armazenados, apenas não exibimos mais o cronômetro.
+- Se uma jornada antiga estava ativa, seu KM é preservado no resumo de hoje na migração.
+- Backup automático no Supabase continua usando a mesma conexão e chave de recuperação.
+
+ATUALIZAÇÃO
+1. No aplicativo atual faça Configurações > Baixar backup .json antes de atualizar.
+2. Extraia o ZIP e envie TODOS os arquivos diretamente à raiz do GitHub (sem criar pasta).
+3. Aguarde o Vercel mostrar Ready; reabra o aplicativo para carregar a nova versão.
+4. NÃO limpe dados do site nem desinstale para forçar atualização, pois pode apagar registros.
+5. Teste com um KM fictício e confira Relatórios e Proteção na nuvem.
+
+IMPORTANTE
+- Sem login, o motorista não precisa interagir com o Supabase.
+- O app não lê automaticamente os quilômetros do Uber/99 nem usa GPS.
+- Para restaurar em outro aparelho, você precisa manter a chave de recuperação em lugar seguro.
